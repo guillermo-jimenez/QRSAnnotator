@@ -85,11 +85,10 @@ app.layout = html.Div([
     ),
     html.Div([
         html.Div([
-            html.H2('Signal Display'),
             dcc.Graph(
                 id='basic-interactions',
                 style={
-                    'height': 1200,
+                    'height': 1000,
                 },
                 figure={
                     'layout': {
