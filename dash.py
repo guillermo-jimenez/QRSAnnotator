@@ -51,7 +51,7 @@ app.scripts.config.serve_locally = False
 TemplateHeader = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'SELECT']
 signal = pd.DataFrame({TemplateHeader[i] : np.zeros(1000,) for i in range(len(TemplateHeader))})
 
-fig = plotly.subplots.make_subplots(rows=13, cols=1, shared_xaxes=True, shared_yaxes=True, vertical_spacing=0.01)
+fig = plotly.subplots.make_subplots(rows=13, cols=1, shared_xaxes=True, shared_yaxes=False, vertical_spacing=0.01)
 for i in range(len(TemplateHeader)):
     fig.append_trace({'x':np.arange(len(signal[TemplateHeader[i]])),'y': signal[TemplateHeader[i]],'name': TemplateHeader[i]},i+1,1)
 
@@ -171,6 +171,19 @@ def update_graph(plot_button, plot_lines, selected_dropdown_value, from_value, t
                     fig.layout.xaxis13.range = [0, 6000]
                 else:
                     fig.layout.xaxis13.range = [0, signal.shape[0]]
+
+            # Set ylim given stupid dash system for this
+            min_val = []
+            max_val = []
+            for j in range(12):
+                min_val.append(int(np.min(fig.data[j]['y'][from_value:to_value])))
+                max_val.append(int(np.max(fig.data[j]['y'][from_value:to_value])))
+            
+            for j in range(12):
+                if j == 0:
+                    fig.layout['yaxis'].range = [np.min(min_val),np.max(max_val)]
+                else:
+                    fig.layout['yaxis'+str(j+1)].range = [np.min(min_val),np.max(max_val)]
 
             # Set lines
             shapes = get_lines(selected_pts[code])
