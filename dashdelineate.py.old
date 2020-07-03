@@ -1,0 +1,425 @@
+from argparse import ArgumentParser
+import plotly.graph_objs as go
+import json
+import dash
+import plotly
+import plotly.subplots
+import plotly.graph_objs.layout as layout
+import dash_core_components as dcc
+import dash_html_components as html
+import dash_table
+import numpy as np
+import flask
+import pandas as pd
+import time
+import pathlib
+import os
+
+from tools.files import list_files
+from tools.files import sorter
+from tools.files import conditional_makedir
+from tools.files import save_fiducials
+from tools.files import load_data
+
+from dash.dependencies import Output, Input, State
+from textwrap import dedent as d
+from datetime import datetime
+from datetime import date
+import os
+import os.path
+import numpy as np
+import plotly.graph_objs as go
+
+"""
+Determine file paths
+"""
+
+# Define paths
+csv = pd.read_csv('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/Dataset.csv', index_col=0)
+paths = {'inputs' : '', 'output' : ''}
+selected_P = dict()
+selected_QRS = dict()
+selected_T = dict()
+
+Pon = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/Pon.csv')
+Poff = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/Poff.csv')
+QRSon = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/QRSon.csv')
+QRSoff = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/QRSoff.csv')
+Ton = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/Ton.csv')
+Toff = load_data('/media/guille/DADES/DADES/PhysioNet/QTDB/manual0/Toff.csv')
+
+##################### DEFINE SERVER #####################
+server = flask.Flask('app')
+server.secret_key = os.environ.get('secret_key', 'secret')
+
+##################### DEFINE APP #####################
+app = dash.Dash(__name__, server=server, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css'])
+app.scripts.config.serve_locally = False
+# dcc._js_dist[0]['external_url'] = 'https://cdn.plot.ly/plotly-basic-latest.min.js'
+
+##################### DEFINE FIGURE #####################
+TemplateHeader = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'SELECT']
+signal = pd.DataFrame({TemplateHeader[i] : np.zeros(1000,) for i in range(1)})
+
+fig = plotly.subplots.make_subplots(rows=2, cols=1, shared_xaxes=True, shared_yaxes=False, vertical_spacing=0.01)
+for i in range(1):
+    # fig.append_trace({'x':np.arange(len(signal[TemplateHeader[i]])),'y': signal[TemplateHeader[i]],'name': TemplateHeader[i]},i+1,1)
+    fig.add_scatter(y=np.zeros((1000,)), mode="lines",
+                name=TemplateHeader[i], row=i+1, col=1)
+fig.add_scatter(y=np.zeros((1000,)), mode="lines",name='SELECT', row=2, col=1)
+
+fig['layout']['xaxis1'].rangeslider.visible = True
+
+fig['layout']['xaxis'].update(title='', range=[0, 500], autorange=False)
+fig.update_traces(line=dict(width=1.5),)
+fig.update_traces(xaxis="x1")
+fig.update_xaxes(spikemode = "across")
+fig.update_xaxes(spikethickness = 1)
+
+
+params = ["Pon","Poff","QRSon","QRSoff","Ton","Toff"]
+
+##################### DEFINE LAYOUT #####################
+app.layout = html.Div([
+    html.P(id='placeholder'),
+    html.H1('TV QRS marker'),
+    html.H2('Select file'),
+    dcc.Dropdown(
+        id='my-dropdown',
+        options=[]
+    ),
+    html.Div([
+        html.Div([
+            dcc.Graph(
+                id='basic-interactions',
+                style={
+                    'height': 600,
+                },
+                figure={
+                    'layout': {
+                        'clickmode': 'event+select'
+                    }
+                },
+            ),
+        ], className="eight columns"),
+        html.Div([
+            html.H2('Control pannel'),
+            html.Button('Delete Last element', id='button'),
+            html.Button('Save Data', id='save'),
+            html.Button('Plot Lines', id='plot_lines'),
+            html.H2('Wave'),
+            dcc.Dropdown(
+                id='wave',
+                options=[{'label': 'Pon',       'value': 'Pon'},
+                         {'label': 'Poff',      'value': 'Poff'},
+                         {'label': 'QRSon',     'value': 'QRSon'},
+                         {'label': 'QRSoff',    'value': 'QRSoff'},
+                         {'label': 'Ton',       'value': 'Ton'},
+                         {'label': 'Toff',      'value': 'Toff'}],
+                value='Pon'
+            ),
+            html.H2('Click Data'),
+            dcc.Markdown(d("""Click on points in the graph.""")),
+            html.Div(id='container-button-basic', children='-'),
+            html.Pre(id='click-data', style={'border': 'thin lightgrey solid','overflowX': 'scroll'}),
+            dcc.Input(id="from", type="text", placeholder="from"),
+            dcc.Input(id="to", type="text", placeholder="to"),
+            html.Button('Rescale View', id='plot'),
+            dash_table.DataTable(
+                id='table-editing-simple',
+                columns=(
+                    [{'id': 'BeatID', 'name': 'BeatID'}] +
+                    [{'id': p, 'name': p} for p in params]
+                ),
+                data=[],
+                editable=True
+            ),
+        ], className="four columns"),
+    ]),
+], className="row")
+
+
+
+
+
+
+##################### DEFINE CALLBACKS #####################
+def get_lines(array: list or np.ndarray, color: str = "#d62728"):
+    return [{
+        'type':'line', 'line':dict(color=color, width=1.),
+        'yref':'paper', 'y0':0, 'y1':1, 
+        'xref':'x', 'x0':array[i], 'x1':array[i],
+    } for i in range(len(array))]
+
+def get_rect(array: list or np.ndarray, color: str):
+    return [{
+        'type':'rect', 
+        'line':dict(color=color, width=1.),
+        'yref':'paper', 
+        'y0':0, 'y1':1, 
+        'xref':'x', 
+        'x0':array[0][i], 'x1':array[1][i],
+        "fillcolor": color,
+        "opacity": 0.25,
+    } for i in range(len(array[0]))]
+
+@app.callback(
+    Output('basic-interactions', 'figure'),
+    [Input('plot', 'n_clicks'),
+    Input('plot_lines', 'n_clicks'),
+    Input('my-dropdown', 'value'),], 
+    [State("from", "value"), 
+    State("to", "value"),])
+def update_graph(plot_button, plot_lines, selected_dropdown_value, from_value, to_value):
+    # Keep track of what triggered whatever
+    execution_instruction = dash.callback_context.triggered[0]['prop_id']
+
+    # Output default
+    js = []
+    # Should always be active to make annotations
+    if (selected_dropdown_value is not None):
+        r, fn = os.path.split(selected_dropdown_value)
+        code = fn.split('.')[0]
+        if ('my-dropdown.value' in execution_instruction):
+            # signal = pd.read_csv(selected_dropdown_value, index_col=0)
+            signal = csv[selected_dropdown_value].values
+            # signal.columns = map(str.upper, signal.columns)
+            for i in range(1):
+                fig.data[i].y = signal
+                fig.data[i].x = np.arange(len(fig.data[i].y))
+            fig.data[-1].y = np.zeros((signal.size,))
+            fig.data[-1].x = np.arange(len(fig.data[-1].y))
+            
+            # Set X range
+            if signal.shape[0] == 60001:
+                fig.layout.xaxis1.range = [0, 6000]
+            elif signal.shape[0] == 120000:
+                fig.layout.xaxis1.range = [0, 10000]
+            else:
+                if signal.shape[0] > 10000:
+                    fig.layout.xaxis1.range = [0, 6000]
+                else:
+                    fig.layout.xaxis1.range = [0, signal.shape[0]]
+
+            # Set lines
+            shapes_P = get_rect([Pon[code],Poff[code]], color="#ff0000")
+            shapes_QRS = get_rect([QRSon[code],QRSoff[code]], color="#15ff00")
+            shapes_T = get_rect([Ton[code],Toff[code]], color="#ff00f7")
+            shapes = shapes_P + shapes_QRS + shapes_T
+            fig.layout.shapes = tuple([layout.Shape(**shapes[i]) for i in range(len(shapes))])
+
+            # Set rational min/max
+            min_val = [[] for _ in range(1)]
+            max_val = [[] for _ in range(1)]
+            for j in range(1):
+                window_size = fig.data[j]['y'].size//10
+                for w in range(0,fig.data[j]['y'].size,window_size):
+                    min_val[j].append(np.min(fig.data[j]['y'][w:w+window_size]))
+                    max_val[j].append(np.max(fig.data[j]['y'][w:w+window_size]))
+                min_val[j] = (1-np.sign(np.median(min_val[j]))*0.25)*np.median(min_val[j])
+                max_val[j] = (1+np.sign(np.median(max_val[j]))*0.25)*np.median(max_val[j])
+                fig.layout['yaxis'+str(j+1)].range = [min_val[j],max_val[j]]
+
+            # for j in range(1):
+            #     fig.layout['yaxis'+str(j+1)].range = [np.max(min_val),np.min(max_val)]
+            
+        elif ('plot_lines.n_clicks' in execution_instruction):
+            # Add vertical lines
+            shapes_P = get_rect([Pon[code],Poff[code]], color="#ff0000")
+            shapes_QRS = get_rect([QRSon[code],QRSoff[code]], color="#15ff00")
+            shapes_T = get_rect([Ton[code],Toff[code]], color="#ff00f7")
+            shapes = shapes_P + shapes_QRS + shapes_T
+            fig.layout.shapes = tuple([layout.Shape(**shapes[i]) for i in range(len(shapes))])
+        elif ('plot.n_clicks' in execution_instruction):
+            from_value = int(float(from_value)*1000)
+            to_value = int(float(to_value)*1000)
+
+            for j in range(1):
+                min_val = int(np.min(fig.data[j]['y'][from_value:to_value]))
+                max_val = int(np.max(fig.data[j]['y'][from_value:to_value]))
+                
+                if j == 0:
+                    fig.layout['yaxis'].range = [min_val,max_val]
+                else:
+                    fig.layout['yaxis'+str(j+1)].range = [min_val,max_val]
+
+    return fig
+        
+
+@app.callback(
+    Output('table-editing-simple', 'data'),
+    [Input('my-dropdown', 'value'),
+     Input('button', 'n_clicks'),
+     Input('basic-interactions', 'clickData'),],
+    [State('wave', 'value')])
+def update_data(key, delete_button, clickData, selected_wave):
+    execution_instruction = dash.callback_context.triggered[0]['prop_id']
+
+    data = []
+    if key is not None:
+        # Select wave
+        if (selected_wave == 'Pon'):
+            selected_point = Pon
+        elif (selected_wave == 'QRSon'):
+            selected_point = QRSon
+        elif (selected_wave == 'Ton'):
+            selected_point = Ton
+        elif (selected_wave == 'Poff'):
+            selected_point = Poff
+        elif (selected_wave == 'QRSoff'):
+            selected_point = QRSoff
+        elif (selected_wave == 'Toff'):
+            selected_point = Toff
+
+        # If the instruction is "Select key to delineate"
+        if ('my-dropdown.value' in execution_instruction):
+            if (key not in Pon.keys()):
+                Pon[key] = []
+                QRSon[key] = []
+                Ton[key] = []
+                Poff[key] = []
+                QRSoff[key] = []
+                Toff[key] = []
+        elif ('basic-interactions.clickData' in execution_instruction):
+            selected_point[key].append(clickData['points'][0]['x'])
+        elif ('button.n_clicks' in execution_instruction) and (len(selected_point[key]) != 0):
+            selected_point[key].pop()
+
+        print(selected_point[key])
+        
+        maxlen = max([len(Pon[key]),len(Poff[key]),len(QRSon[key]),len(QRSoff[key]),len(Ton[key]),len(Toff[key]),])
+        for i in range(maxlen):
+            data.append({
+                "BeatID":   i+1,
+                "Pon":      Pon[key][i] if i < len(Pon[key]) else None,
+                "Poff":     Poff[key][i] if i < len(Poff[key]) else None,
+                "QRSon":    QRSon[key][i] if i < len(QRSon[key]) else None,
+                "QRSoff":   QRSoff[key][i] if i < len(QRSoff[key]) else None,
+                "Ton":      Ton[key][i] if i < len(Ton[key]) else None,
+                "Toff":     Toff[key][i] if i < len(Toff[key]) else None,
+            })
+    return data
+
+
+# @app.callback(
+#     Output('click-data', 'children'),
+#     [Input('button', 'n_clicks'),
+#     Input('basic-interactions', 'clickData'),
+#     Input('my-dropdown', 'value'),
+#     Input('wave', 'value')])
+# def display_click_data(delete_button, clickData, selected_dropdown_value, selected_wave):
+#     execution_instruction = dash.callback_context.triggered[0]['prop_id']
+
+#     # Output default
+#     js = []
+#     if selected_dropdown_value is not None:
+#         r, fn = os.path.split(selected_dropdown_value)
+#         code = fn.split('.')[0]
+
+#         # Select wave
+#         if (selected_wave == 'Pon'):
+#             selected_point = Pon
+#         elif (selected_wave == 'QRSon'):
+#             selected_point = QRSon
+#         elif (selected_wave == 'Ton'):
+#             selected_point = Ton
+#         elif (selected_wave == 'Poff'):
+#             selected_point = Poff
+#         elif (selected_wave == 'QRSoff'):
+#             selected_point = QRSoff
+#         elif (selected_wave == 'Toff'):
+#             selected_point = Toff
+#         else:
+#             raise ValueError("Select type of wave first")
+
+#         # print(selected_point[code])
+#         # print(type(selected_point[code]))
+
+#         # If the instruction is "Select key to delineate"
+#         if ('my-dropdown.value' in execution_instruction):
+#             if code not in selected_P.keys():
+#                 Pon[code] = []
+#                 QRSon[code] = []
+#                 Ton[code] = []
+#                 Poff[code] = []
+#                 QRSoff[code] = []
+#                 Toff[code] = []
+#         elif ('basic-interactions.clickData' in execution_instruction):
+#             selected_point[code].append(clickData['points'][0]['x'])
+#         elif ('button.n_clicks' in execution_instruction) and (len(selected_point[code]) != 0):
+#             selected_point[code].pop()
+#         js = selected_point[code]
+#     return json.dumps(js)
+
+
+# @app.callback(
+#     Output('container-button-basic', 'children'),
+#     [Input('save', 'n_clicks')],)
+# def save_on_click(n_clicks):
+#     if len(selected_P) != 0:
+#         save_fiducials(selected_P,paths['outputP'])
+#     if len(selected_QRS) != 0:
+#         save_fiducials(selected_QRS,paths['outputQRS'])
+#     if len(selected_T) != 0:
+#         save_fiducials(selected_T,paths['outputT'])
+#     return "Saved at " + str(datetime.now())
+
+
+@app.callback(
+    Output('placeholder', 'n_clicks'),
+    [Input('table-editing-simple', 'data'),
+     Input('table-editing-simple', 'columns')],
+    [State('my-dropdown', 'value'),])
+def display_output(rows, columns, key):
+    # Do without dataframe, messing everything with NaN and stuff
+    df = pd.DataFrame(rows, columns=[c['name'] for c in columns], dtype='int')
+
+    # Update all values
+    Pon[key] = df['Pon'].values.squeeze().tolist()
+    Poff[key] = df['Poff'].values.squeeze().tolist()
+    QRSon[key] = df['QRSon'].values.squeeze().tolist()
+    QRSoff[key] = df['QRSoff'].values.squeeze().tolist()
+    Ton[key] = df['Ton'].values.squeeze().tolist()
+    Toff[key] = df['Toff'].values.squeeze().tolist()
+
+    print(Ton[key])
+
+    return 0
+
+
+##################### EXECUTE APP #####################
+if __name__ == '__main__':
+    # Parse arguments
+    parser = ArgumentParser()
+    parser.add_argument('--path', type=str, help='input path', required=True)
+    parser.add_argument('--type', type=str, help='type of input', default='files')
+    parser.add_argument('--leads', type=int, help='number of leads', default=12)
+    parser.add_argument('--output_P', type=str, help='output P path', default='./output_P_{}.csv'.format(datetime.now().isoformat()))
+    parser.add_argument('--output_QRS', type=str, help='output QRS path', default='./output_QRS_{}.csv'.format(datetime.now().isoformat()))
+    parser.add_argument('--output_T', type=str, help='output T path', default='./output_T_{}.csv'.format(datetime.now().isoformat()))
+    inputs = parser.parse_args()
+
+    paths['inputs'] = inputs.path
+    paths['outputP'] = inputs.output_P
+    paths['outputQRS'] = inputs.output_QRS
+    paths['outputT'] = inputs.output_T
+    
+    # Load previous output path
+    if os.path.isfile(paths['outputP']):
+        selected_P = load_data(paths['outputP'])
+        selected_P.pop('0',None)
+    if os.path.isfile(paths['outputQRS']):
+        selected_QRS = load_data(paths['outputQRS'])
+        selected_QRS.pop('0',None)
+    if os.path.isfile(paths['outputT']):
+        selected_T = load_data(paths['outputT'])
+        selected_T.pop('0',None)
+
+    if inputs.type.lower() == 'files':
+        app.layout['my-dropdown'].options = list_files(paths['inputs'])
+    elif inputs.type.lower() == 'csv':
+        opts = [{'label': k, 'value': k} for k in csv]
+        app.layout['my-dropdown'].options = opts
+
+    app.run_server()
+
