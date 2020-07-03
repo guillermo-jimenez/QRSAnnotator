@@ -1,7 +1,17 @@
+from typing import Tuple
 import os
 import os.path
 import glob
 import numpy as np
+
+def get_binary_on_off(binary_mask: np.ndarray, axis=-1) -> Tuple[list,list]:
+    binary_mask = binary_mask.astype(int)
+    diff = np.diff(np.pad(binary_mask,((1,1),),'constant',constant_values=0),axis=axis)
+
+    onsets = (np.where(diff ==  1.)[0]).tolist()
+    offsets = (np.where(diff == -1.)[0] - 1).tolist()
+    
+    return onsets, offsets
 
 def list_files(path: str, extension: str = '') -> list:
     opts = []
@@ -10,6 +20,15 @@ def list_files(path: str, extension: str = '') -> list:
             fname, ext = os.path.splitext(file)
             root, fname = os.path.split(fname)
             opts.append({'label': fname, 'value': os.path.join(file)})
+    return opts
+
+def list_files_bokeh(path: str, extension: str = '') -> list:
+    opts = []
+    sort_order = []
+    for file in glob.glob(os.path.join(path,'*'+extension)):
+        if os.path.isfile(file):
+            root, fname = os.path.split(file)
+            opts.append(fname)
     return opts
 
 def sorter(total_items):
