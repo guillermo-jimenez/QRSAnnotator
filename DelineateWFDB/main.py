@@ -18,6 +18,9 @@ from bokeh.plotting import figure
 
 basedir = '/home/guille/DADES/DADES/Challenge2020/STPETERSBURG'
 
+# Standard header
+StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
+
 # Check different codes
 files = []
 
@@ -28,10 +31,6 @@ for file in glob.glob(join(basedir,'*.mat')):
 
 def nix(val, lst):
     return [x for x in lst if x != val]
-
-# Standard header
-StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
-
 
 # New segmentations
 P = load_data('./P.csv') if isfile('./P.csv') else {}
