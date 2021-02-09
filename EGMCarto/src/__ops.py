@@ -234,7 +234,7 @@ def retrieve_segmentation(file_selector, waveselector, current_keys, local_field
 
     wavedic = eval(wave)
     for i,k in enumerate(current_keys):
-        if (k is not None) and len(wavedic.get(f'{fname}###{k}',[]) != 0):
+        if (k is not None) and (len(wavedic.get(f'{fname}###{k}',[])) != 0):
             sources[i].selected.indices = np.concatenate([np.arange(on,off) for on,off in wavedic[f'{fname}###{k}']]).astype(int).squeeze().tolist()
         else:
             sources[i].selected.indices = []
