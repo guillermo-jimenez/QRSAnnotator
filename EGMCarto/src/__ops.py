@@ -28,11 +28,12 @@ def file_change(attrname, old, new, args, file_correspondence,
                 leads, boxes_local_field, boxes_far_field, rangeslider, 
                 textbox, all_waves, waveselector, local_field, far_field,
                 previous_local_field, previous_far_field, ):
-    if (new == " ") or (new is None) or (old == new):
+    fname = new
+    if (fname == " ") or (fname is None) or (old == new):
         return None
 
     # Load signal
-    signal,header = read_sample(file_correspondence[new])
+    signal,header = read_sample(file_correspondence[fname])
 
     # Filter useless columns and sort
     signal = sort_columns(signal)
@@ -77,8 +78,8 @@ def file_change(attrname, old, new, args, file_correspondence,
         wavedic = eval(wave)
 
         for k in signal:
-            if f'{new}###{k}' in wavedic:
-                onoff = np.array(wavedic[f'{new}###{k}'])
+            if f'{fname}###{k}' in wavedic:
+                onoff = np.array(wavedic[f'{fname}###{k}'])
                 if onoff.size == 0:
                     continue
                 filt_onoff = (onoff >= 0).all(1) & (onoff < signal.shape[0]).all(1)
@@ -87,33 +88,33 @@ def file_change(attrname, old, new, args, file_correspondence,
                     delete_locations = np.sort(np.argwhere(~filt_onoff)[:,0])
 
                     for ix in reversed(delete_locations):
-                        wavedic[f'{new}###{k}'].pop(ix)
+                        wavedic[f'{fname}###{k}'].pop(ix)
 
-    # Load points into selector
-    for wave in all_waves:
-        # Select wave & previous
-        wavedic = eval(wave)
-        previous = eval(f"previous_{wave}")
 
-        # Input segmentation info for every wave
-        for i,k in enumerate(signal):
-            if f'{new}###{k}' in wavedic:
-                if len(wavedic[f'{new}###{k}']) != 0:
-                    onoff = np.array(wavedic[f'{new}###{k}'])
-                    onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
-                    if len(onoff) > 1:
-                        tmp = np.concatenate(onoff).squeeze().tolist()
-                        previous[i] = tmp
-                        sources[i].selected.indices = tmp
-                    else:
-                        tmp = onoff[0].squeeze().tolist()
-                        previous[i] = tmp
-                        sources[i].selected.indices = tmp
-                    textbox.text = "Loaded points:      \t"
+    # Retrieve segmentations
+    wave = all_waves[waveselector.active]
+    wavedic = eval(wave)
+    previous = eval(f"previous_{wave}")
+
+    # Input segmentation info for every wave
+    for i,k in enumerate(signal):
+        if f'{fname}###{k}' in wavedic:
+            if len(wavedic[f'{fname}###{k}']) != 0:
+                onoff = np.array(wavedic[f'{fname}###{k}'])
+                onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+                if len(onoff) > 1:
+                    tmp = np.concatenate(onoff).squeeze().tolist()
+                    previous[i] = tmp
+                    sources[i].selected.indices = tmp
                 else:
-                    sources[i].selected.indices = []
+                    tmp = onoff[0].squeeze().tolist()
+                    previous[i] = tmp
+                    sources[i].selected.indices = tmp
+                textbox.text = "Loaded points:      \t"
             else:
                 sources[i].selected.indices = []
+        else:
+            sources[i].selected.indices = []
 
     # Set xlim
     for i,k in enumerate(signal):
@@ -123,14 +124,19 @@ def file_change(attrname, old, new, args, file_correspondence,
     # Show used boxes
     for wave in all_waves:
         wavedic = eval(wave)
+        boxes = eval(f"boxes_{wave}")
 
-        for i,k in enumerate(signal):
-            if f'{new}###{k}' in wavedic:
-                boxes = eval(f"boxes_{wave}")
-                for j,(on,off) in enumerate(wavedic[f'{new}###{k}']):
+        for i in range(args.num_sources):
+            k = current_keys[i]
+            
+            for j in range(args.num_boxes):
+                if j < len(wavedic.get(f'{fname}###{k}',[])):
+                    (on,off) = wavedic[f'{fname}###{k}'][j]
                     boxes[i][j].left = on
                     boxes[i][j].right = off
                     boxes[i][j].visible = True
+                else:
+                    boxes[i][j].visible = False
 
 
 # define callback functions
@@ -186,7 +192,7 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
 
 
 
-def selection_change(attrname, old, new, i, all_waves, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field, args, propagatebutton, previous_local_field, previous_far_field):
+def selection_change(attrname, old, new, i, all_waves, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field, args, propagatebutton, previous_local_field, previous_far_field, slider_threshold):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
@@ -222,7 +228,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
             mask = np.pad(mask,kernel_size)
             mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
 
-            if (args.threshold is not None) and (propagatebutton.active):
+            if (slider_threshold.value is not None) and (propagatebutton.active):
                 has_been_executed = False
                 while not has_been_executed:
                     #~~ Try to propagate new points by convolving with > 0.99% cross-correlation ~~#
@@ -256,10 +262,10 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
                             # print(f"windowed_signal.shape = {windowed_signal.shape}")
                             # print(f"window = {window}")
                             # print(f"window.shape = {window.shape}")
-                            raise
+                            break
 
                     # Predict mask
-                    corr_mask = np.array(correlations) > args.threshold
+                    corr_mask = np.array(correlations) > slider_threshold.value
                     corr_onsets = []
                     corr_offsets = []
                     for on,off in zip(*sak.signal.get_mask_boundary(corr_mask)):

@@ -26,7 +26,7 @@ from sak.signal import StandardHeader
 parser = ArgumentParser()
 parser.add_argument("--basedir",     type=str, required=True)
 parser.add_argument("--num_boxes",   type=int, default=20)
-parser.add_argument("--num_sources", type=int, default=100)
+parser.add_argument("--num_sources", type=int, default=50)
 parser.add_argument("--threshold",   type=float, default=None)
 parser.add_argument("--title",       type=str, default="Project")
 args = parser.parse_args(sys.argv[1:])
@@ -46,7 +46,7 @@ for file in all_filepaths:
     _, fname = os.path.split(file)
     fname, ext = os.path.splitext(fname)
     file_correspondence['/'.join([fname])] = file
-files = list(file_correspondence) + [" "]
+files = [" "] + list(file_correspondence)
 
 # New segmentations
 local_field = {}
@@ -65,7 +65,7 @@ current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
 sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
-leads = [figure(plot_width=1500, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
+leads = [figure(plot_width=1600, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
 previous_local_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_far_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 
@@ -91,13 +91,14 @@ grid = gridplot(leads, ncols=1, toolbar_location='right')
 
 # Set widgets
 rangeslider = RangeSlider(start=0, end=2500, step=10, value=(0,2500), title="X range")
+slider_threshold = Slider(start=0.5, end=1, step=0.01, value=0.95, title="Threshold for propagation")
 file_selector = Select(value=" ", options=files)
 waveselector = RadioButtonGroup(labels=all_waves, active=0)
 textbox = PreText(text="New points:      \t[]")
 retrievebutton = Button(label='Retrieve Segmentation')
-storebutton = Button(label='Store Segmentation')
+storebutton = Button(label='Store', height_policy="fit", width_policy="fixed", width=50, orientation="vertical", button_type="primary")
 writebutton = Button(label='Write to File')
-propagatebutton = Toggle(label='Propagate', active=True)
+propagatebutton = Toggle(label='Prop.', active=True, height_policy="fit", width_policy="fixed", width=50, orientation="vertical")#aspect_ratio=0.002)
 
 
 # Set callbacks
@@ -116,7 +117,7 @@ for i,source in enumerate(sources):
                                                  boxes_far_field=boxes_far_field, boxes_local_field=boxes_local_field,
                                                  args=args, propagatebutton=propagatebutton,
                                                  previous_local_field=previous_local_field, 
-                                                 previous_far_field=previous_far_field, ))#, cb_save_segmentation)
+                                                 previous_far_field=previous_far_field, slider_threshold=slider_threshold))#, cb_save_segmentation)
 retrievebutton.on_click(partial(src.retrieve_segmentation, file_selector=file_selector, waveselector=waveselector, 
                                 current_keys=current_keys, local_field=local_field, 
                                 far_field=far_field, sources=sources))
@@ -135,8 +136,9 @@ waveselector.on_change('active', partial(src.wave_change, args=args, all_waves=a
                                          textbox=textbox))
 
 # set up layout
-buttons = row(waveselector,retrievebutton,storebutton,writebutton,propagatebutton)
-layout = column(file_selector,textbox,rangeslider,buttons,grid)
+buttons = row(waveselector,retrievebutton,writebutton)
+visor = row(grid,propagatebutton,storebutton)
+layout = column(file_selector,textbox,slider_threshold,rangeslider,buttons,visor)
 
 # initialize
 curdoc().add_root(layout)
