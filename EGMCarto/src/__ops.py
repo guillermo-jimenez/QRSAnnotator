@@ -40,7 +40,7 @@ def file_change(attrname, old, new, args, file_correspondence,
     col_names = list(signal)
 
     # Include signals into data dict
-    data = [{"x": np.arange(signal.shape[0]), "y": signal[k].values} for i,k in enumerate(signal)]
+    data = [{"x": np.arange(signal.shape[0]), "y": signal[k].values, "label": np.full((signal.shape[0],),col_names[i])} for i,k in enumerate(signal)]
 
     # Load current data
     for i in range(args.num_sources):
@@ -57,8 +57,8 @@ def file_change(attrname, old, new, args, file_correspondence,
             for b in boxes_far_field[i]:
                 b.visible = False
         else:
-            sources[i].data = {"x": np.arange(100), "y": np.zeros((100,))}
-            sources_static[i].data = {"x": np.arange(100), "y": np.zeros((100,))}
+            sources[i].data = {"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}
+            sources_static[i].data = {"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}
             current_keys[i] = None
             leads[i].visible = False
     
@@ -275,6 +275,8 @@ def save_segmentation(file_selector, waveselector, sources, current_keys, local_
         if (len(onsets) != 0) and (len(offsets) != 0):
             wavedic[f"{fname}###{k}"] = [[on,off] for on,off in zip(onsets,offsets)]
             counter += 1
+        elif f"{fname}###{k}" in wavedic:
+            wavedic.pop(f"{fname}###{k}")
 
     if counter > 0:
         textbox.text = f"Stored segmentation for {wave}. \t"

@@ -63,7 +63,7 @@ for wave in all_waves:
 current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
-sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
+sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
 leads = [figure(plot_width=1500, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select") for _ in range(args.num_sources)]
 
 # Retrieve source ids
@@ -73,7 +73,7 @@ id_map_sources_static = {s.id: i for i,s in enumerate(sources_static)}
 # Set common lead parameters
 for i in range(args.num_sources):
     leads[i].visible = False
-    leads[i].line('x', 'y', line_width=1.5, source=sources_static[i])
+    leads[i].line('x', 'y', line_width=1.5, source=sources_static[i], legend_field="label")
     leads[i].circle('x', 'y', size=1, source=sources[i], color=None, selection_color="orange")
     leads[i].xaxis.visible = False
     leads[i].yaxis.visible = False
