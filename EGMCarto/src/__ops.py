@@ -200,12 +200,12 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
     set_new = set(new)
     set_old = set(old)
     set_previous = set(previous[i])
-    print("\n\n\n\n\n\n\n")
-    print(f"new = {new}")
-    print(f"old = {old}")
-    print(f"previous = {previous}")
-    print(f"x = {source.data['x']}")
-    print(f"y = {source.data['y']}")
+    # print("\n\n\n\n\n\n\n")
+    # print(f"new = {new}")
+    # print(f"old = {old}")
+    # print(f"previous = {previous}")
+    # print(f"x = {source.data['x']}")
+    # print(f"y = {source.data['y']}")
     if set_new != set_previous:
         if len(set_new.difference(set_old)) > 0:
             # Define list of new points
@@ -244,19 +244,19 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
                             c,_ = sak.signal.xcorr(fundamental,w,maxlags=0)
                             correlations[j] = c
                         except:
-                            print("\n\n\n\n\n\n\n")
-                            print(f"new = {new}")
-                            print(f"old = {old}")
-                            print(f"indices = {source.selected.indices}")
-                            print(f"signal = {signal}")
-                            print(f"signal.shape = {signal.shape}")
-                            print(f"fundamental = {fundamental}")
-                            print(f"fundamental.shape = {fundamental.shape}")
-                            print(f"windowed_signal = {windowed_signal}")
-                            print(f"windowed_signal.shape = {windowed_signal.shape}")
-                            print(f"window = {window}")
-                            print(f"window.shape = {window.shape}")
-                            break
+                            # print("\n\n\n\n\n\n\n")
+                            # print(f"new = {new}")
+                            # print(f"old = {old}")
+                            # print(f"indices = {source.selected.indices}")
+                            # print(f"signal = {signal}")
+                            # print(f"signal.shape = {signal.shape}")
+                            # print(f"fundamental = {fundamental}")
+                            # print(f"fundamental.shape = {fundamental.shape}")
+                            # print(f"windowed_signal = {windowed_signal}")
+                            # print(f"windowed_signal.shape = {windowed_signal.shape}")
+                            # print(f"window = {window}")
+                            # print(f"window.shape = {window.shape}")
+                            raise
 
                     # Predict mask
                     corr_mask = np.array(correlations) > args.threshold
