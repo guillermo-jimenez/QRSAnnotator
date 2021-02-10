@@ -17,7 +17,7 @@ import os.path
 from pandas.core.frame import DataFrame
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, gridplot
-from bokeh.models import ColumnDataSource, PreText, Select, Slider, RangeSlider, Button, RadioButtonGroup, BoxAnnotation, Band, Quad
+from bokeh.models import ColumnDataSource, PreText, Select, Slider, RangeSlider, Toggle, Button, RadioButtonGroup, BoxAnnotation, Band, Quad
 from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
@@ -27,6 +27,7 @@ parser = ArgumentParser()
 parser.add_argument("--basedir",     type=str, required=True)
 parser.add_argument("--num_boxes",   type=int, default=20)
 parser.add_argument("--num_sources", type=int, default=100)
+parser.add_argument("--threshold",   type=float, default=None)
 parser.add_argument("--title",       type=str, default="Project")
 args = parser.parse_args(sys.argv[1:])
 
@@ -64,7 +65,9 @@ current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
 sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
-leads = [figure(plot_width=1500, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select") for _ in range(args.num_sources)]
+leads = [figure(plot_width=1500, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
+previous_local_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
+previous_far_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 
 # Retrieve source ids
 id_map_sources = {s.id: i for i,s in enumerate(sources)}
@@ -87,41 +90,52 @@ for i in range(args.num_sources):
 grid = gridplot(leads, ncols=1, toolbar_location='right')
 
 # Set widgets
-rangeslider = RangeSlider(start=0, end=20000, step=10, value=(0,3000), title="X range")
+rangeslider = RangeSlider(start=0, end=2500, step=10, value=(0,2500), title="X range")
 file_selector = Select(value=" ", options=files)
 waveselector = RadioButtonGroup(labels=all_waves, active=0)
 textbox = PreText(text="New points:      \t[]")
 retrievebutton = Button(label='Retrieve Segmentation')
 storebutton = Button(label='Store Segmentation')
 writebutton = Button(label='Write to File')
+propagatebutton = Toggle(label='Propagate', active=True)
+
 
 # Set callbacks
 file_selector.on_change('value', partial(src.file_change, args=args, file_correspondence=file_correspondence, 
-                                                          current_data=current_data, current_keys=current_keys, 
-                                                          sources=sources, sources_static=sources_static, 
-                                                          leads=leads, boxes_local_field=boxes_local_field, 
-                                                          boxes_far_field=boxes_far_field, rangeslider=rangeslider, 
-                                                          textbox=textbox, all_waves=all_waves, waveselector=waveselector, 
-                                                          local_field=local_field, far_field=far_field))
+                                         current_data=current_data, current_keys=current_keys, 
+                                         sources=sources, sources_static=sources_static, 
+                                         leads=leads, boxes_local_field=boxes_local_field, 
+                                         boxes_far_field=boxes_far_field, rangeslider=rangeslider, 
+                                         textbox=textbox, all_waves=all_waves, waveselector=waveselector, 
+                                         local_field=local_field, far_field=far_field,
+                                         previous_local_field=previous_local_field, 
+                                         previous_far_field=previous_far_field))#, cb_save_segmentation)
 for i,source in enumerate(sources):
-    source.selected.on_change('indices', partial(src.selection_change, i=i, file_selector=file_selector, sources=sources, 
-                                                                       waveselector=waveselector, leads=leads, 
-                                                                       boxes_far_field=boxes_far_field, 
-                                                                       boxes_local_field=boxes_local_field))
+    source.selected.on_change('indices', partial(src.selection_change, i=i, all_waves=all_waves, file_selector=file_selector, 
+                                                 sources=sources, waveselector=waveselector, leads=leads, 
+                                                 boxes_far_field=boxes_far_field, boxes_local_field=boxes_local_field,
+                                                 args=args, propagatebutton=propagatebutton,
+                                                 previous_local_field=previous_local_field, 
+                                                 previous_far_field=previous_far_field, ))#, cb_save_segmentation)
 retrievebutton.on_click(partial(src.retrieve_segmentation, file_selector=file_selector, waveselector=waveselector, 
-                                                           current_keys=current_keys, local_field=local_field, 
-                                                           far_field=far_field, sources=sources))
+                                current_keys=current_keys, local_field=local_field, 
+                                far_field=far_field, sources=sources))
 storebutton.on_click(partial(src.save_segmentation, file_selector=file_selector, waveselector=waveselector, sources=sources, 
-                                                           current_keys=current_keys, local_field=local_field, 
-                                                           far_field=far_field, textbox=textbox))
+                             current_keys=current_keys, local_field=local_field, 
+                             far_field=far_field, textbox=textbox))
 writebutton.on_click(partial(src.write_segmentation,local_field=local_field,far_field=far_field))
-rangeslider.on_change('value',partial(src.change_range, rangeslider=rangeslider, leads=leads))
-waveselector.on_change('active', partial(src.wave_change, file_selector=file_selector, local_field=local_field, 
-                                                          far_field=far_field, sources=sources, current_keys=current_keys, 
-                                                          textbox=textbox))
+rangeslider.on_change('value', partial(src.change_range, rangeslider=rangeslider, leads=leads))
+waveselector.on_change('active', partial(src.wave_change, args=args, all_waves=all_waves, file_selector=file_selector, 
+                                         local_field=local_field, far_field=far_field, 
+                                         sources=sources, current_keys=current_keys, 
+                                         previous_local_field=previous_local_field, 
+                                         previous_far_field=previous_far_field,
+                                         boxes_local_field=boxes_local_field, 
+                                         boxes_far_field=boxes_far_field,
+                                         textbox=textbox))
 
 # set up layout
-buttons = row(waveselector,retrievebutton,storebutton,writebutton)
+buttons = row(waveselector,retrievebutton,storebutton,writebutton,propagatebutton)
 layout = column(file_selector,textbox,rangeslider,buttons,grid)
 
 # initialize

@@ -26,7 +26,8 @@ from sak.signal import StandardHeader
 def file_change(attrname, old, new, args, file_correspondence, 
                 current_data, current_keys, sources, sources_static, 
                 leads, boxes_local_field, boxes_far_field, rangeslider, 
-                textbox, all_waves, waveselector, local_field, far_field):
+                textbox, all_waves, waveselector, local_field, far_field,
+                previous_local_field, previous_far_field, ):
     if (new == " ") or (new is None) or (old == new):
         return None
 
@@ -69,7 +70,7 @@ def file_change(attrname, old, new, args, file_correspondence,
                 b.visible = False
     
     # Redefine rangeslider
-    rangeslider.end = max([signal.shape[0],3072])
+    rangeslider.end = max([signal.shape[0],2500])
 
     # Remove out-of-bounds segmentations
     for wave in all_waves:
@@ -88,25 +89,31 @@ def file_change(attrname, old, new, args, file_correspondence,
                     for ix in reversed(delete_locations):
                         wavedic[f'{new}###{k}'].pop(ix)
 
-    # Retrieve segmentations
-    wave = all_waves[waveselector.active]
-    wavedic = eval(wave)
-
     # Load points into selector
-    for i,k in enumerate(signal):
-        if f'{new}###{k}' in wavedic:
-            if len(wavedic[f'{new}###{k}']) != 0:
-                onoff = np.array(wavedic[f'{new}###{k}'])
-                onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
-                if len(onoff) > 1:
-                    sources[i].selected.indices = np.concatenate(onoff).squeeze().tolist()
+    for wave in all_waves:
+        # Select wave & previous
+        wavedic = eval(wave)
+        previous = eval(f"previous_{wave}")
+
+        # Input segmentation info for every wave
+        for i,k in enumerate(signal):
+            if f'{new}###{k}' in wavedic:
+                if len(wavedic[f'{new}###{k}']) != 0:
+                    onoff = np.array(wavedic[f'{new}###{k}'])
+                    onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+                    if len(onoff) > 1:
+                        tmp = np.concatenate(onoff).squeeze().tolist()
+                        previous[i] = tmp
+                        sources[i].selected.indices = tmp
+                    else:
+                        tmp = onoff[0].squeeze().tolist()
+                        previous[i] = tmp
+                        sources[i].selected.indices = tmp
+                    textbox.text = "Loaded points:      \t"
                 else:
-                    sources[i].selected.indices = onoff[0].squeeze().tolist()
-                textbox.text = "Loaded points:      \t"
+                    sources[i].selected.indices = []
             else:
                 sources[i].selected.indices = []
-        else:
-            sources[i].selected.indices = []
 
     # Set xlim
     for i,k in enumerate(signal):
@@ -127,7 +134,7 @@ def file_change(attrname, old, new, args, file_correspondence,
 
 
 # define callback functions
-def wave_change(attrname, old, new, file_selector, local_field, far_field, sources, current_keys, textbox):
+def wave_change(attrname, old, new, args, all_waves, file_selector, local_field, far_field, sources, current_keys, previous_local_field, previous_far_field, boxes_local_field, boxes_far_field, textbox):
     fname = file_selector.value
     if (fname == " ") or (fname is None) or (new is None) or (old == new):
         return None
@@ -139,6 +146,7 @@ def wave_change(attrname, old, new, file_selector, local_field, far_field, sourc
 
     # Define the dict which will be used
     wavedic = eval(wave)
+    previous = eval(f"previous_{wave}")
 
     for i,k in enumerate(current_keys):
         if k is None:
@@ -146,64 +154,150 @@ def wave_change(attrname, old, new, file_selector, local_field, far_field, sourc
         if len(wavedic.get(f'{fname}###{k}', [])) != 0:
             onoff = [np.arange(on,off,dtype=int) for on,off in wavedic[f'{fname}###{k}']]
             if len(onoff) > 1:
-                sources[i].selected.indices = np.concatenate(onoff).squeeze().tolist()
+                tmp = np.concatenate(onoff).squeeze().tolist()
+                previous[i] = tmp
+                sources[i].selected.indices = tmp
             else:
-                sources[i].selected.indices = onoff[0].squeeze().tolist()
+                tmp = onoff[0].squeeze().tolist()
+                previous[i] = tmp
+                sources[i].selected.indices = tmp
             textbox.text = "Loaded points:      \t"
         else:
             sources[i].selected.indices = []
 
 
-def selection_change(attrname, old, new, i, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field):
+    # Show used boxes
+    for wave in all_waves:
+        # Retrieve wave and boxes
+        wavedic = eval(wave)
+        boxes = eval(f"boxes_{wave}")
+
+        for i in range(args.num_sources):
+            k = current_keys[i]
+
+            for j in range(args.num_boxes):
+                if j < len(wavedic.get(f'{fname}###{k}', [])):
+                    (on,off) = wavedic[f'{fname}###{k}'][j]
+                    boxes[i][j].left = on
+                    boxes[i][j].right = off
+                    boxes[i][j].visible = True
+                else:
+                    boxes[i][j].visible = False
+
+
+
+def selection_change(attrname, old, new, i, all_waves, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field, args, propagatebutton, previous_local_field, previous_far_field):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
+
+    # 0. Get wave information
+    wave = all_waves[waveselector.active]
+    previous = eval(f"previous_{wave}")
 
     # 1. Obtain binary mask of old and new points
     source = sources[i]
     set_new = set(new)
     set_old = set(old)
-    if len(set_new.difference(set_old)) > 0:
-        # Define list of new points
-        new_pts = np.array(list(set_new.difference(set_old)))
-        
-        # Binary close masks
-        tmp_mask = np.zeros_like(source.data["x"],dtype=bool)
-        tmp_mask[new_pts] = True
-        kernel_size = tmp_mask.size//10
-        tmp_mask = np.pad(tmp_mask,kernel_size)
-        tmp_mask = skimage.morphology.binary_closing(tmp_mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+    set_previous = set(previous[i])
+    print("\n\n\n\n\n\n\n")
+    print(f"new = {new}")
+    print(f"old = {old}")
+    print(f"previous = {previous}")
+    print(f"x = {source.data['x']}")
+    print(f"y = {source.data['y']}")
+    if set_new != set_previous:
+        if len(set_new.difference(set_old)) > 0:
+            # Define list of new points
+            new_pts = np.array(list(set_new.difference(set_old)))
+            
+            # Binary close masks
+            mask = np.zeros_like(source.data["x"],dtype=bool)
+            mask[new_pts] = True
+            kernel_size = mask.size//10
+            mask = np.pad(mask,kernel_size)
+            mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
 
-        kernel_size = tmp_mask.size//10
-        tmp_mask = np.pad(tmp_mask,kernel_size)
-        tmp_mask = skimage.morphology.binary_closing(tmp_mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+            kernel_size = mask.size//10
+            mask = np.pad(mask,kernel_size)
+            mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
 
-        # Input new points in 
-        source.selected.indices = list(set_old.union(set(np.where(tmp_mask)[0].tolist())))
-    elif len(set_old.difference(set_new)) > 0:
-        # Define list of deleted points
-        erased_pts = np.array(list(set_old.difference(set_new)))
+            if (args.threshold is not None) and (propagatebutton.active):
+                has_been_executed = False
+                while not has_been_executed:
+                    #~~ Try to propagate new points by convolving with > 0.99% cross-correlation ~~#
+                    # Retrieve signal
+                    signal = np.copy(source.data["y"]).astype(float)
 
-        # Binary close masks
-        tmp_mask = np.zeros_like(source.data["x"],dtype=bool)
-        tmp_mask[erased_pts] = True
-        kernel_size = tmp_mask.size//10
-        tmp_mask = np.pad(tmp_mask,kernel_size)
-        tmp_mask = skimage.morphology.binary_closing(tmp_mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+                    # Define fundamental
+                    fundamental = signal[mask].astype(float)
+                                
+                    # Obtain windowing
+                    windowed_signal  = skimage.util.view_as_windows(signal,fundamental.size).astype(float)
 
-        kernel_size = tmp_mask.size//10
-        tmp_mask = np.pad(tmp_mask,kernel_size)
-        tmp_mask = skimage.morphology.binary_closing(tmp_mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+                    # Compute correlations
+                    correlations  = np.zeros((windowed_signal.shape[0],))
+                    for j,window in enumerate(windowed_signal):
+                        # Correct deviations w.r.t zero
+                        try:
+                            w = sak.signal.on_off_correction(np.copy(window))
+                            c,_ = sak.signal.xcorr(fundamental,w,maxlags=0)
+                            correlations[j] = c
+                        except:
+                            print("\n\n\n\n\n\n\n")
+                            print(f"new = {new}")
+                            print(f"old = {old}")
+                            print(f"indices = {source.selected.indices}")
+                            print(f"signal = {signal}")
+                            print(f"signal.shape = {signal.shape}")
+                            print(f"fundamental = {fundamental}")
+                            print(f"fundamental.shape = {fundamental.shape}")
+                            print(f"windowed_signal = {windowed_signal}")
+                            print(f"windowed_signal.shape = {windowed_signal.shape}")
+                            print(f"window = {window}")
+                            print(f"window.shape = {window.shape}")
+                            break
 
-        # Input new points in 
-        source.selected.indices = list(set_old.difference(set(np.where(tmp_mask)[0].tolist())))
+                    # Predict mask
+                    corr_mask = np.array(correlations) > args.threshold
+                    corr_onsets = []
+                    corr_offsets = []
+                    for on,off in zip(*sak.signal.get_mask_boundary(corr_mask)):
+                        if on != off: on += np.argmax(correlations[on:off])
+                        else:         on += 0
+                        mask[on:on+fundamental.size] = True
+
+                    # Avoid crisis!
+                    has_been_executed = True
+
+            # Input new points in selected
+            new_selected = list(set_old.union(set(np.where(mask)[0].tolist())))
+            previous[i] = new_selected
+            source.selected.indices = new_selected
+        elif len(set_old.difference(set_new)) > 0:
+            # Define list of deleted points
+            erased_pts = np.array(list(set_old.difference(set_new)))
+
+            # Binary close masks
+            mask = np.zeros_like(source.data["x"],dtype=bool)
+            mask[erased_pts] = True
+            kernel_size = mask.size//10
+            mask = np.pad(mask,kernel_size)
+            mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+
+            kernel_size = mask.size//10
+            mask = np.pad(mask,kernel_size)
+            mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
+
+            # Input new points in selected
+            source.selected.indices = list(set_old.difference(set(np.where(mask)[0].tolist())))
 
     # 2. Obtain onsets and offsets
-    mask = np.zeros_like(source.data["x"],dtype=bool)
+    on_off_mask = np.zeros_like(source.data["x"],dtype=bool)
     selected = source.selected.indices
     if len(selected) != 0:
-        mask[selected] = True
-    onsets, offsets = sak.signal.get_mask_boundary(mask)
+        on_off_mask[selected] = True
+    onsets, offsets = sak.signal.get_mask_boundary(on_off_mask)
 
     # 3. Retrieve active wave for displaying
     if   waveselector.active == 0: wave = "local_field"
