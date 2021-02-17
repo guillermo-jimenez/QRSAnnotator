@@ -59,9 +59,9 @@ def get_tagged_points(basedir):
 # define callback functions
 def file_change(attrname, old, new, args, file_correspondence, 
                 current_data, current_keys, sources, sources_static, 
-                leads, boxes_local_field, boxes_far_field, rangeslider, 
-                textbox, all_waves, waveselector, local_field, far_field,
-                previous_local_field, previous_far_field, ):
+                leads, boxes_local_field, boxes_local_P, boxes_far_field, rangeslider, 
+                textbox, all_waves, waveselector, local_field, far_field, local_P,
+                previous_local_field, previous_far_field, previous_local_P):
     fname = new
     if (fname == " ") or (fname is None) or (old == new):
         return None
@@ -88,10 +88,10 @@ def file_change(attrname, old, new, args, file_correspondence,
             leads[i].visible = True
     
             # Hide unfilled boxes
-            for b in boxes_local_field[i]:
-                b.visible = False
-            for b in boxes_far_field[i]:
-                b.visible = False
+            for wave in all_waves:
+                boxes = eval(f"boxes_{wave}")
+                for b in boxes[i]:
+                    b.visible = False
         else:
             sources[i].data = {"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}
             sources_static[i].data = {"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}
@@ -99,10 +99,10 @@ def file_change(attrname, old, new, args, file_correspondence,
             leads[i].visible = False
     
             # Hide unfilled boxes
-            for b in boxes_local_field[i]:
-                b.visible = False
-            for b in boxes_far_field[i]:
-                b.visible = False
+            for wave in all_waves:
+                boxes = eval(f"boxes_{wave}")
+                for b in boxes[i]:
+                    b.visible = False
     
     # Redefine rangeslider
     rangeslider.end = max([signal.shape[0],2500])
@@ -174,15 +174,17 @@ def file_change(attrname, old, new, args, file_correspondence,
 
 
 # define callback functions
-def wave_change(attrname, old, new, args, all_waves, file_selector, local_field, far_field, sources, current_keys, previous_local_field, previous_far_field, boxes_local_field, boxes_far_field, textbox):
+def wave_change(attrname, old, new, args, all_waves, file_selector, local_field, far_field, local_P, previous_local_P, boxes_local_P, sources, current_keys, previous_local_field, previous_far_field, boxes_local_field, boxes_far_field, textbox):
     fname = file_selector.value
     if (fname == " ") or (fname is None) or (new is None) or (old == new):
         return None
     
     # Retrieve segmentations
-    if   new == 0: wave = "local_field"
-    elif new == 1: wave = "far_field"
-    else: raise ValueError(f"Not supposed to happen.")
+    wave = all_waves[new]
+    # if   new == 0: wave = "local_P"
+    # if   new == 1: wave = "local_field"
+    # elif new == 2: wave = "far_field"
+    # else: raise ValueError(f"Not supposed to happen.")
 
     # Define the dict which will be used
     wavedic = eval(wave)
@@ -226,7 +228,7 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
 
 
 
-def selection_change(attrname, old, new, i, all_waves, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field, args, propagatebutton, previous_local_field, previous_far_field, slider_threshold):
+def selection_change(attrname, old, new, i, all_waves, file_selector, sources, waveselector, leads, boxes_far_field, boxes_local_field, boxes_local_P, args, propagatebutton, previous_local_field, previous_far_field, previous_local_P, slider_threshold):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
@@ -340,9 +342,10 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
     onsets, offsets = sak.signal.get_mask_boundary(on_off_mask)
 
     # 3. Retrieve active wave for displaying
-    if   waveselector.active == 0: wave = "local_field"
-    elif waveselector.active == 1: wave = "far_field"
-    else: ValueError("Not supposed to happen.")
+    wave = all_waves[waveselector.active]
+    # if   waveselector.active == 0: wave = "local_field"
+    # elif waveselector.active == 1: wave = "far_field"
+    # else: ValueError("Not supposed to happen.")
 
     # 4. Hide old annotations
     boxes = eval(f"boxes_{wave}")
@@ -357,14 +360,16 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
             boxes[i][j].visible = True
 
 
-def retrieve_segmentation(file_selector, waveselector, current_keys, local_field, far_field, sources):
+def retrieve_segmentation(file_selector, waveselector, current_keys, local_field, local_P, far_field, sources):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
 
-    if   waveselector.active == 0: wave = "local_field"
-    elif waveselector.active == 1: wave = "far_field"
-    else: ValueError("Not supposed to happen.")
+    # Get selected wave
+    wave = all_waves[waveselector.active]
+    # if   waveselector.active == 0: wave = "local_field"
+    # elif waveselector.active == 1: wave = "far_field"
+    # else: ValueError("Not supposed to happen.")
 
     wavedic = eval(wave)
     for i,k in enumerate(current_keys):
@@ -376,16 +381,17 @@ def retrieve_segmentation(file_selector, waveselector, current_keys, local_field
 
 
 ################################################### VOY POR AQUÍ ###################################################
-def save_segmentation(file_selector, waveselector, sources, current_keys, local_field, far_field, textbox):
+def save_segmentation(file_selector, all_waves, waveselector, sources, current_keys, local_field, local_P, far_field, textbox):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
 
     # 1. Retrieve save dictionary
-    if   waveselector.active == 0: wave = "local_field"
-    elif waveselector.active == 1: wave = "far_field"
-    else: raise ValueError("Not supposed to happen")
+    wave = all_waves[waveselector.active]
     wavedic = eval(wave)
+    # if   waveselector.active == 0: wave = "local_field"
+    # elif waveselector.active == 1: wave = "far_field"
+    # else: raise ValueError("Not supposed to happen")
 
     # 2. For every source available
     counter = 0
@@ -417,7 +423,8 @@ def save_segmentation(file_selector, waveselector, sources, current_keys, local_
     else:
         textbox.text = f"No segmentation found for {wave}. Skipping... \t"
         
-def write_segmentation(local_field,far_field):
+def write_segmentation(local_field,far_field,local_P):
+    sak.save_data(local_P,'./local_P.csv')
     sak.save_data(local_field,'./local_field.csv')
     sak.save_data(far_field,'./far_field.csv')
 
