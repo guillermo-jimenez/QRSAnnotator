@@ -50,7 +50,7 @@ for i,file in enumerate(all_filepaths):
     _, fname = os.path.split(file)
     fname, ext = os.path.splitext(fname)
     if file in tagged_points:
-        file_correspondence['/'.join([fname]) + f' ({tagged_points[file]})'] = file
+        file_correspondence['/'.join([fname]) + f' @ {tagged_points[file]}'] = file
         tagged_idx.append(i)
     else:
         file_correspondence['/'.join([fname])] = file

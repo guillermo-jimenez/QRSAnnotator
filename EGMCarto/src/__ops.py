@@ -112,7 +112,7 @@ def file_change(attrname, old, new, args, file_correspondence,
         wavedic = eval(wave)
 
         for k in signal:
-            onoff = np.array(wavedic.get(f'{fname}###{k}',[])])
+            onoff = np.array(wavedic.get(f'{fname}###{k}',[]))
             if onoff.size == 0:
                 continue
             filt_onoff = (onoff >= 0).all(1) & (onoff < signal.shape[0]).all(1)
