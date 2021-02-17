@@ -12,6 +12,7 @@ import skimage
 import skimage.morphology
 import os
 import os.path
+import xml.etree.ElementTree as ET
 from pandas.core.frame import DataFrame
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, gridplot
@@ -20,6 +21,39 @@ from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
 
+
+def get_tagged_points(basedir):
+    all_studies_xml = glob.glob(os.path.join(basedir,'Databases','*','Export','[a-zA-Z]*.xml'))
+    
+    # Output structure
+    tagged_points = {}
+    
+    # Iterate over studies
+    for study_xml in all_studies_xml:
+        # Get file path
+        froot,fname = os.path.split(study_xml)
+        
+        # Get tree's root (all appended to it)
+        root = ET.parse(study_xml).getroot()
+
+        # Get table info
+        xml_tags = root.find("Maps/TagsTable").findall("Tag")
+        tag_correspondence = {tag.get('ID'): tag.get('Full_Name') for tag in xml_tags}
+
+        # Points by map
+        xml_maps =  root.find("Maps").findall("Map")
+
+        for xml_map in xml_maps:
+            xml_points = xml_map.find("CartoPoints").findall("Point")
+
+            points = {}
+            for xml_point in xml_points:
+                tag = xml_point.find("Tags")
+                if tag is not None:
+                    path = os.path.join(froot,f"{xml_map.get('Name')}_P{xml_point.get('Id')}_ECG_Export.txt")
+                    tagged_points[path] = tag_correspondence[tag.text]
+
+    return tagged_points
 
 
 # define callback functions

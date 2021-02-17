@@ -34,6 +34,7 @@ args = parser.parse_args(sys.argv[1:])
 # Hyperparameters
 all_waves = ["local_field", "far_field"]
 all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','*','Export','*ECG_Export*.txt'))
+tagged_points = src.get_tagged_points(args.basedir)
 tools = 'xbox_select,reset,ywheel_zoom,pan,box_zoom,undo,redo,save,crosshair,hover'
 
 # Create annotation boxes
@@ -42,11 +43,23 @@ boxes_local_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="g
 
 # Check different codes
 file_correspondence = {}
-for file in all_filepaths:
+tagged_idx = []
+untagged_idx = []
+for i,file in enumerate(all_filepaths):
     _, fname = os.path.split(file)
     fname, ext = os.path.splitext(fname)
-    file_correspondence['/'.join([fname])] = file
-files = [" "] + list(file_correspondence)
+    if file in tagged_points:
+        file_correspondence['/'.join([fname]) + f' ({tagged_points[file]})'] = file
+        tagged_idx.append(i)
+    else:
+        file_correspondence['/'.join([fname])] = file
+        untagged_idx.append(i)
+sorter = np.zeros((len(all_filepaths),),dtype=int)
+sorter[:len(tagged_idx)] = tagged_idx
+sorter[len(tagged_idx):] = untagged_idx
+# sorter = np.hstack
+files = np.array(list(file_correspondence))
+files = [" "] + files[sorter].tolist()
 
 # New segmentations
 local_field = {}
