@@ -143,7 +143,7 @@ retrievebutton.on_click(partial(src.retrieve_segmentation, file_selector=file_se
 storebutton.on_click(partial(src.save_segmentation, file_selector=file_selector, waveselector=waveselector, sources=sources, 
                              current_keys=current_keys, local_field=local_field, local_P=local_P, 
                              far_field=far_field, textbox=textbox, all_waves=all_waves))
-writebutton.on_click(partial(src.write_segmentation, local_field=local_field, far_field=far_field, local_P=local_P))
+writebutton.on_click(partial(src.write_segmentation, all_waves=all_waves, local_field=local_field, far_field=far_field, local_P=local_P))
 rangeslider.on_change('value', partial(src.change_range, rangeslider=rangeslider, leads=leads))
 waveselector.on_change('active', partial(src.wave_change, args=args, all_waves=all_waves, file_selector=file_selector, 
                                          local_field=local_field, far_field=far_field, 

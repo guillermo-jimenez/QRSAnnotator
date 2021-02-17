@@ -112,17 +112,16 @@ def file_change(attrname, old, new, args, file_correspondence,
         wavedic = eval(wave)
 
         for k in signal:
-            if f'{fname}###{k}' in wavedic:
-                onoff = np.array(wavedic[f'{fname}###{k}'])
-                if onoff.size == 0:
-                    continue
-                filt_onoff = (onoff >= 0).all(1) & (onoff < signal.shape[0]).all(1)
-                if np.any(filt_onoff):
-                    onoff = onoff[filt_onoff,:]
-                    delete_locations = np.sort(np.argwhere(~filt_onoff)[:,0])
+            onoff = np.array(wavedic.get(f'{fname}###{k}',[])])
+            if onoff.size == 0:
+                continue
+            filt_onoff = (onoff >= 0).all(1) & (onoff < signal.shape[0]).all(1)
+            if np.any(filt_onoff):
+                onoff = onoff[filt_onoff,:]
+                delete_locations = np.sort(np.argwhere(~filt_onoff)[:,0])
 
-                    for ix in reversed(delete_locations):
-                        wavedic[f'{fname}###{k}'].pop(ix)
+                for ix in reversed(delete_locations):
+                    wavedic[f'{fname}###{k}'].pop(ix)
 
 
     # Retrieve segmentations
@@ -132,23 +131,18 @@ def file_change(attrname, old, new, args, file_correspondence,
 
     # Input segmentation info for every wave
     for i,k in enumerate(signal):
-        if f'{fname}###{k}' in wavedic:
-            if len(wavedic[f'{fname}###{k}']) != 0:
-                onoff = np.array(wavedic[f'{fname}###{k}'])
-                onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
-                if len(onoff) > 1:
-                    tmp = np.concatenate(onoff).squeeze().tolist()
-                    previous[i] = tmp
-                    sources[i].selected.indices = tmp
-                else:
-                    tmp = onoff[0].squeeze().tolist()
-                    previous[i] = tmp
-                    sources[i].selected.indices = tmp
-                textbox.text = "Loaded points:      \t"
-            else:
-                sources[i].selected.indices = []
-        else:
+        onoff = np.array(wavedic.get(f'{fname}###{k}', []))
+        onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+        if len(onoff) == 0:
             sources[i].selected.indices = []
+        else:
+            if len(onoff) == 1:
+                tmp = onoff[0].squeeze().tolist()
+            else:
+                tmp = np.concatenate(onoff).squeeze().tolist()
+            previous[i] = tmp
+            sources[i].selected.indices = tmp
+            textbox.text = "Loaded points"
 
     # Set xlim
     for i,k in enumerate(signal):
@@ -193,20 +187,18 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
     for i,k in enumerate(current_keys):
         if k is None:
             continue
-        if len(wavedic.get(f'{fname}###{k}', [])) != 0:
-            onoff = [np.arange(on,off,dtype=int) for on,off in wavedic[f'{fname}###{k}']]
-            if len(onoff) > 1:
-                tmp = np.concatenate(onoff).squeeze().tolist()
-                previous[i] = tmp
-                sources[i].selected.indices = tmp
-            else:
-                tmp = onoff[0].squeeze().tolist()
-                previous[i] = tmp
-                sources[i].selected.indices = tmp
-            textbox.text = "Loaded points:      \t"
-        else:
+        onoff = np.array(wavedic.get(f'{fname}###{k}', []))
+        onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+        if len(onoff) == 0:
             sources[i].selected.indices = []
-
+        else:
+            if len(onoff) == 1:
+                tmp = onoff[0].squeeze().tolist()
+            else:
+                tmp = np.concatenate(onoff).squeeze().tolist()
+            previous[i] = tmp
+            sources[i].selected.indices = tmp
+            textbox.text = "Loaded points"
 
     # Show used boxes
     for wave in all_waves:
@@ -413,20 +405,20 @@ def save_segmentation(file_selector, all_waves, waveselector, sources, current_k
 
         # 2.3. Save fiducials
         if (len(onsets) != 0) and (len(offsets) != 0):
-            wavedic[f"{fname}###{k}"] = [[on,off] for on,off in zip(onsets,offsets)]
+            wavedic[f'{fname}###{k}'] = [[on,off] for on,off in zip(onsets,offsets)]
             counter += 1
-        elif f"{fname}###{k}" in wavedic:
-            wavedic.pop(f"{fname}###{k}")
+        elif f'{fname}###{k}' in wavedic:
+            wavedic.pop(f'{fname}###{k}')
 
     if counter > 0:
         textbox.text = f"Stored segmentation for {wave}. \t"
     else:
         textbox.text = f"No segmentation found for {wave}. Skipping... \t"
         
-def write_segmentation(local_field,far_field,local_P):
-    sak.save_data(local_P,'./local_P.csv')
-    sak.save_data(local_field,'./local_field.csv')
-    sak.save_data(far_field,'./far_field.csv')
+def write_segmentation(all_waves,local_field,far_field,local_P):
+    for wave in all_waves:
+        wavedic = eval(wave)
+        sak.save_data(wavedic,f'./{wave}.csv')
 
 def change_range(attrname, old, new, rangeslider, leads):
     low, high = rangeslider.value
