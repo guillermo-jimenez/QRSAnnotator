@@ -14,10 +14,12 @@ import numpy as np
 import glob
 import os
 import os.path
+import torch
+import dill
 from pandas.core.frame import DataFrame
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, gridplot
-from bokeh.models import ColumnDataSource, PreText, Select, Slider, RangeSlider, Toggle, Button, RadioButtonGroup, BoxAnnotation, Band, Quad
+from bokeh.models import ColumnDataSource, PreText, Select, Slider, RangeSlider, Toggle, Button, RadioButtonGroup, BoxAnnotation, Band, Quad, Span
 from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
@@ -29,6 +31,7 @@ parser.add_argument("--num_boxes",   type=int, default=20)
 parser.add_argument("--num_sources", type=int, default=50)
 parser.add_argument("--threshold",   type=float, default=None)
 parser.add_argument("--title",       type=str, default="Project")
+parser.add_argument("--model_name",  type=str, default="WNet5LevelsSelfAttentionDiceOnly_20201130125349")
 args = parser.parse_args(sys.argv[1:])
 
 # Hyperparameters
@@ -42,6 +45,25 @@ boxes_far_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="mag
 boxes_local_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="green") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="red") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 
+# Create delineation spans & mark as invisible
+span_Pon    = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+# span_Poff   = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_Poff   = 0
+span_QRSon  = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+# span_QRSoff = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_QRSoff = 0
+span_Ton    = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+# span_Toff   = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_Toff   = 0
+
+for wave in ["P", "QRS", "T"]:
+    # for t in ["on", "off"]:
+    # span = eval(f"span_{wave}{t}")
+    span = eval(f"span_{wave}on")
+    for i in range(args.num_sources):
+        for j in range(args.num_boxes):
+            span[i][j].visible = False
+                
 # Check different codes
 file_correspondence = {}
 tagged_idx = []
@@ -80,7 +102,7 @@ current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
 sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
-leads = [figure(plot_width=1500, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
+leads = [figure(plot_width=1550, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
 previous_local_P = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_local_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_far_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
@@ -103,19 +125,40 @@ for i in range(args.num_sources):
         leads[i].add_layout(boxes_far_field[i][j])
         leads[i].add_layout(boxes_local_P[i][j])
         leads[i].add_layout(boxes_local_field[i][j])
+        leads[i].add_layout(span_Pon[i][j])
+        # leads[i].add_layout(span_Poff[i][j])
+        leads[i].add_layout(span_QRSon[i][j])
+        # leads[i].add_layout(span_QRSoff[i][j])
+        leads[i].add_layout(span_Ton[i][j])
+        # leads[i].add_layout(span_Toff[i][j])
 
-grid = gridplot(leads, ncols=1, toolbar_location='right')
+# Define figure grid
+grid = gridplot(leads, ncols=1, toolbar_location='above')
+
+# Load delineation models
+basepath = f'/media/guille/DADES/DADES/Delineator'
+model_type = 'model_best'
+
+# Load models
+models = {}
+for i in range(5):
+    path = os.path.join(basepath, 'TrainedModels', args.model_name, f'fold_{i+1}', f'{model_type}.model')
+    models[f'fold_{i+1}'] = torch.load(path, pickle_module=dill).eval().float()
+
+
 
 # Set widgets
 rangeslider = RangeSlider(start=0, end=2500, step=10, value=(0,2500), title="X range")
 slider_threshold = Slider(start=0.5, end=1, step=0.01, value=0.90, title="Threshold for propagation")
 file_selector = Select(value=" ", options=files)
-waveselector = RadioButtonGroup(labels=all_waves, active=0, height_policy="fit", width_policy="fixed", width=150, orientation="vertical")
+waveselector = RadioButtonGroup(labels=["P", "LF", "FF"], active=0, height_policy="fit", width_policy="fixed", width=80, orientation="vertical")
 textbox = PreText(text="New points:      \t[]")
 retrievebutton = Button(label='Retrieve Segmentation')
-storebutton = Button(label='Store', height_policy="fit", width_policy="fixed", width=50, orientation="vertical", button_type="primary")
+storebutton = Button(label='St', height_policy="fit", width_policy="fixed", width=27, orientation="vertical", button_type="primary")
 writebutton = Button(label='Write to File')
-propagatebutton = Toggle(label='Prop.', active=True, height_policy="fit", width_policy="fixed", width=50, orientation="vertical")#aspect_ratio=0.002)
+propagatebutton = Toggle(label='Pr', active=True, height_policy="fit", width_policy="fixed", width=27, orientation="vertical")#aspect_ratio=0.002)
+delineatebutton = Button(label='Delineate')
+undelineatebutton = Button(label='Undelineate')
 
 
 # Set callbacks
@@ -154,9 +197,14 @@ waveselector.on_change('active', partial(src.wave_change, args=args, all_waves=a
                                          boxes_local_field=boxes_local_field, 
                                          boxes_far_field=boxes_far_field,
                                          textbox=textbox))
+delineatebutton.on_click(partial(src.predict, args=args, span_Pon=span_Pon, span_Poff=span_Poff, span_QRSon=span_QRSon, 
+                                 span_QRSoff=span_QRSoff, span_Ton=span_Ton, span_Toff=span_Toff, models=models,
+                                 file_selector=file_selector, file_correspondence=file_correspondence))
+undelineatebutton.on_click(partial(src.remove_delineations, span_Pon=span_Pon, span_Poff=span_Poff, span_QRSon=span_QRSon, 
+                                   span_QRSoff=span_QRSoff, span_Ton=span_Ton, span_Toff=span_Toff))
 
 # set up layout
-buttons = row(retrievebutton,writebutton)
+buttons = row(retrievebutton,writebutton,delineatebutton,undelineatebutton)
 visor = row(grid,propagatebutton,storebutton,waveselector)
 layout = column(file_selector,textbox,slider_threshold,rangeslider,buttons,visor)
 

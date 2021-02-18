@@ -10,16 +10,138 @@ import cv2
 import glob
 import skimage
 import skimage.morphology
+import torch
+import tqdm
 import os
 import os.path
+import math
 import xml.etree.ElementTree as ET
 from pandas.core.frame import DataFrame
+from functools import partial
 from bokeh.io import curdoc
 from bokeh.layouts import column, row, gridplot
 from bokeh.models import ColumnDataSource, PreText, Select, Slider, RangeSlider, Button, RadioButtonGroup, BoxAnnotation, Band, Quad
 from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
+
+def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.25, batch_size = 16, use_tqdm=False, normalize=False):
+    # Preprocess signal
+    signal = np.copy(signal).squeeze()
+    if signal.ndim == 0:
+        return np.array([])
+    elif signal.ndim == 1:
+        signal = signal[:,None]
+    elif signal.ndim == 2:
+        if signal.shape[0] < signal.shape[1]:
+            signal = signal.T
+    else:
+        raise ValueError("2 dims max allowed")
+        
+    # Pad if necessary
+    if signal.shape[0] < window_size:
+        signal = np.pad(signal,((0,math.ceil(signal.shape[0]/window_size)*window_size-signal.shape[0]),(0,0)),mode='edge')
+    if (signal.shape[0]-window_size)%stride != 0:
+        signal = np.pad(signal,((0,math.ceil((signal.shape[0]-window_size)/stride)*stride-(signal.shape[0]%window_size)),(0,0)),mode='edge')
+    
+    # Get dimensions
+    N,L = signal.shape
+    
+    # Data structure for computing the segmentation
+    windowed_signal = skimage.util.view_as_windows(signal,(window_size,1),(stride,1))
+    
+    # Flat batch shape
+    new_shape = (windowed_signal.shape[0]*windowed_signal.shape[1],*windowed_signal.shape[2:])
+    windowed_signal = np.reshape(windowed_signal,new_shape)
+
+    # Exchange channel position
+    windowed_signal = np.swapaxes(windowed_signal,1,2)
+
+    # (Optional) Normalize amplitudes
+    if normalize:
+        amplitude = np.percentile(
+            sak.signal.moving_lambda(
+                windowed_signal[:,0,:].T,
+                256,
+                partial(sak.signal.amplitude,axis=0)
+            ),
+            percentile,
+            axis=0
+        )
+        amplitude[amplitude == 0] = 1.
+        windowed_signal = windowed_signal/(amplitude[:,None,None]*1)
+        
+
+    # Output structures
+    windowed_mask = np.zeros((windowed_signal.shape[0],3,windowed_signal.shape[-1]),dtype=float)
+
+    # Compute segmentation for all leads independently
+    with torch.no_grad():
+        iterator = range(0,windowed_signal.shape[0],batch_size)
+        if use_tqdm: 
+            iterator = tqdm.tqdm(iterator)
+        for i in iterator:
+            inputs = {"x": torch.tensor(windowed_signal[i:i+batch_size]).cuda().float()}
+            windowed_mask[i:i+batch_size] = model.cuda()(inputs)["sigmoid"].cpu().detach().numpy() > thr_dice
+
+    # Retrieve mask as 1D
+    counter = np.zeros((N), dtype=int)
+    segmentation = np.zeros((3,N))
+        
+    # Iterate over windows
+    for i in range(0,windowed_mask.shape[0],L):
+        counter[(i//L)*stride:(i//L)*stride+window_size] += 1
+        segmentation[:,(i//L)*stride:(i//L)*stride+window_size] += windowed_mask[i:i+L].sum(0)
+    segmentation = ((segmentation/counter) >= (signal.shape[-1]*ptg_voting))
+
+    return segmentation
+
+
+def remove_delineations(span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, span_Toff):
+    for i,wave in enumerate(["P", "QRS", "T"]):
+        # for t in ["on", "off"]:
+        # span = eval(f"span_{wave}{t}")
+        span = eval(f"span_{wave}on")
+        for j in range(len(span)):
+            for k in range(len(span[j])):
+                span[j][k].visible = False
+
+
+def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, span_Toff, args, file_selector, file_correspondence, models):
+    # Retrieve file name
+    fname = file_selector.value
+
+    # Get data
+    signal,header = read_sample(file_correspondence[fname])
+    signal = filter_bipolar(sort_columns(signal))
+    signal = signal.values[:,:12]
+
+    fs = 1000.; target_fs = 250.; down_factor = int(fs/target_fs);
+
+    signal = sp.signal.decimate(signal.astype("float32"),down_factor,axis=0)
+
+    # Obtain segmentation
+    segmentation = 0
+    for fold in models:
+        segmentation += predict_mask(signal,models[fold],use_tqdm=False,window_size=512,stride=64,normalize=True,ptg_voting=0.5)
+    segmentation = segmentation >= 3
+
+    for i,wave in enumerate(["P", "QRS", "T"]):
+        on,off = sak.signal.get_mask_boundary(segmentation[i,:])
+        # for t in ["on", "off"]:
+        # fiducial = eval(t)
+        # span = eval(f"span_{wave}{t}")
+        span = eval(f"span_{wave}on")
+        fiducial = on
+        for j in range(args.num_sources):
+            for k in range(args.num_boxes):
+                if k < len(fiducial):
+                    span[j][k].visible = True
+                    span[j][k].location = fiducial[k]*down_factor
+                else:
+                    span[j][k].visible = False
+
+
 
 
 def get_tagged_points(basedir):
@@ -264,19 +386,23 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
                     signal = np.copy(source.data["y"]).astype(float)
 
                     # Define fundamental
-                    fundamental = signal[mask].astype(float)
+                    fundamental = sak.signal.on_off_correction(np.copy(signal[mask].astype(float)))
+                    ampl_fundamental = sak.signal.amplitude(fundamental)
                                 
                     # Obtain windowing
                     windowed_signal  = skimage.util.view_as_windows(signal,fundamental.size).astype(float)
 
                     # Compute correlations
                     correlations  = np.zeros((windowed_signal.shape[0],))
+                    amplitudes    = np.zeros((windowed_signal.shape[0],))
                     for j,window in enumerate(windowed_signal):
                         # Correct deviations w.r.t zero
                         try:
                             w = sak.signal.on_off_correction(np.copy(window))
                             c,_ = sak.signal.xcorr(fundamental,w,maxlags=0)
                             correlations[j] = c
+                            ampl_w = sak.signal.amplitude(w)
+                            amplitudes[j] = min([ampl_fundamental,ampl_w])/max([ampl_fundamental,ampl_w])
                         except:
                             # print("\n\n\n\n\n\n\n")
                             # print(f"new = {new}")
@@ -294,6 +420,8 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
 
                     # Predict mask
                     corr_mask = np.array(correlations) > slider_threshold.value
+                    ampl_mask = sak.signal.sigmoid(100*(amplitudes-0.5)) > 0.5
+                    corr_mask = corr_mask * ampl_mask
                     corr_onsets = []
                     corr_offsets = []
                     for on,off in zip(*sak.signal.get_mask_boundary(corr_mask)):
@@ -461,8 +589,9 @@ def read_sample(file):
                 header["column_ids"] = [l.split("(")[1].replace(")","") for l in line.strip().split(" ") if l]
             else:
                 break
-    
-    signal = pd.read_fwf(file, sep=" ", skiprows=4, names=header["columns"])
+
+    signal = pd.read_fwf(file, sep=" ", skiprows=3)
+    signal.columns = [c.split("(")[0] for c in signal.columns]
     return signal,header
 
 
