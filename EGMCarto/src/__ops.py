@@ -25,7 +25,7 @@ from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
 
-def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.25, batch_size = 16, use_tqdm=False, normalize=False):
+def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.25, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6):
     # Preprocess signal
     signal = np.copy(signal).squeeze()
     if signal.ndim == 0:
@@ -59,16 +59,13 @@ def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, perc
 
     # (Optional) Normalize amplitudes
     if normalize:
-        amplitude = np.percentile(
-            sak.signal.moving_lambda(
-                windowed_signal[:,0,:].T,
-                256,
-                partial(sak.signal.amplitude,axis=0)
-            ),
-            percentile,
-            axis=0
-        )
-        amplitude[amplitude == 0] = 1.
+        amplitude = np.array(sak.signal.moving_lambda(
+            windowed_signal[:,0,:].T,
+            256,
+            partial(sak.signal.amplitude,axis=0)
+        ))
+        amplitude = amplitude[np.all(amplitude > norm_threshold,axis=1),:]
+        amplitude = np.percentile(amplitude, percentile, axis=0)
         windowed_signal = windowed_signal/(amplitude[:,None,None]*1)
         
 
@@ -123,7 +120,7 @@ def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, spa
     # Obtain segmentation
     segmentation = 0
     for fold in models:
-        segmentation += predict_mask(signal,models[fold],use_tqdm=False,window_size=512,stride=64,normalize=True,ptg_voting=0.5)
+        segmentation += predict_mask(signal,models[fold],use_tqdm=False,window_size=512,stride=64,normalize=True,ptg_voting=0.5,percentile=25)
     segmentation = segmentation >= 3
 
     for i,wave in enumerate(["P", "QRS", "T"]):

@@ -47,14 +47,11 @@ boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="red")
 
 # Create delineation spans & mark as invisible
 span_Pon    = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-# span_Poff   = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_Poff   = 0
+span_Poff   = 0 # [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_QRSon  = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-# span_QRSoff = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_QRSoff = 0
+span_QRSoff = 0 # [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_Ton    = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-# span_Toff   = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_Toff   = 0
+span_Toff   = 0 # [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 
 for wave in ["P", "QRS", "T"]:
     # for t in ["on", "off"]:
@@ -126,10 +123,10 @@ for i in range(args.num_sources):
         leads[i].add_layout(boxes_local_P[i][j])
         leads[i].add_layout(boxes_local_field[i][j])
         leads[i].add_layout(span_Pon[i][j])
-        # leads[i].add_layout(span_Poff[i][j])
         leads[i].add_layout(span_QRSon[i][j])
-        # leads[i].add_layout(span_QRSoff[i][j])
         leads[i].add_layout(span_Ton[i][j])
+        # leads[i].add_layout(span_Poff[i][j])
+        # leads[i].add_layout(span_QRSoff[i][j])
         # leads[i].add_layout(span_Toff[i][j])
 
 # Define figure grid
