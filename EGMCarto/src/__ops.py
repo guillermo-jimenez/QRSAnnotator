@@ -25,7 +25,7 @@ from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
 
-def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.25, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6):
+def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.5, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6):
     # Preprocess signal
     signal = np.copy(signal).squeeze()
     if signal.ndim == 0:
