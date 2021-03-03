@@ -25,7 +25,7 @@ from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
 
-def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.5, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6):
+def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.5, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6, filter=False):
     # Preprocess signal
     signal = np.copy(signal).squeeze()
     if signal.ndim == 0:
@@ -43,13 +43,43 @@ def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, perc
         signal = np.pad(signal,((0,math.ceil(signal.shape[0]/window_size)*window_size-signal.shape[0]),(0,0)),mode='edge')
     if (signal.shape[0]-window_size)%stride != 0:
         signal = np.pad(signal,((0,math.ceil((signal.shape[0]-window_size)/stride)*stride-(signal.shape[0]%window_size)),(0,0)),mode='edge')
-    
+
     # Get dimensions
     N,L = signal.shape
-    
+
+    # (Optional) Normalize amplitudes
+    if normalize:
+        # Get signal when it's not flat zero
+        norm_signal = signal[np.all(np.abs(np.diff(signal,axis=0,append=0)) >= norm_threshold,axis=1),:]
+
+        # High pass filter normalized signal to avoid issues with baseline wander
+        norm_signal = sp.signal.filtfilt(*sp.signal.butter(2, 0.5/250., 'high'),norm_signal, axis=0)
+
+        # Compute amplitude for those segments
+        amplitude = np.array(sak.signal.moving_lambda(
+            norm_signal,
+            256,
+            partial(sak.signal.amplitude,axis=0),
+            axis=0
+        ))
+        amplitude = amplitude[np.all(amplitude > norm_threshold,axis=1),]
+        amplitude = np.percentile(amplitude, percentile, axis=0)
+
+        # Apply normalization
+        signal = signal/amplitude[None,:]
+
+    # (Optional) Filter signal
+    if filter:
+        signal = sp.signal.filtfilt(*sp.signal.butter(2,   0.5/target_fs, 'high'),signal,axis=0)
+        signal = sp.signal.filtfilt(*sp.signal.butter(2, 125.0/target_fs,  'low'),signal,axis=0)
+
+    # Avoid issues with negative strides due to filtering:
+    if np.any(np.array(signal.strides) < 0):
+        signal = signal.copy()
+
     # Data structure for computing the segmentation
     windowed_signal = skimage.util.view_as_windows(signal,(window_size,1),(stride,1))
-    
+
     # Flat batch shape
     new_shape = (windowed_signal.shape[0]*windowed_signal.shape[1],*windowed_signal.shape[2:])
     windowed_signal = np.reshape(windowed_signal,new_shape)
@@ -57,21 +87,9 @@ def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, perc
     # Exchange channel position
     windowed_signal = np.swapaxes(windowed_signal,1,2)
 
-    # (Optional) Normalize amplitudes
-    if normalize:
-        amplitude = np.array(sak.signal.moving_lambda(
-            windowed_signal[:,0,:].T,
-            256,
-            partial(sak.signal.amplitude,axis=0)
-        ))
-        amplitude = amplitude[np.all(amplitude > norm_threshold,axis=1),:]
-        amplitude = np.percentile(amplitude, percentile, axis=0)
-        windowed_signal = windowed_signal/(amplitude[:,None,None]*1)
-        
-
     # Output structures
     windowed_mask = np.zeros((windowed_signal.shape[0],3,windowed_signal.shape[-1]),dtype=float)
-
+    
     # Compute segmentation for all leads independently
     with torch.no_grad():
         iterator = range(0,windowed_signal.shape[0],batch_size)
@@ -120,7 +138,7 @@ def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, spa
     # Obtain segmentation
     segmentation = 0
     for fold in models:
-        segmentation += predict_mask(signal,models[fold],use_tqdm=False,window_size=512,stride=64,normalize=True,ptg_voting=0.5,percentile=25)
+        segmentation += predict_mask(signal,models[fold],use_tqdm=False,window_size=512,stride=64,normalize=True,ptg_voting=0.5,percentile=25,filter=False)
     segmentation = segmentation >= 3
 
     for i,wave in enumerate(["P", "QRS", "T"]):
@@ -196,6 +214,7 @@ def file_change(attrname, old, new, args, file_correspondence,
 
     # Include signals into data dict
     data = [{"x": np.arange(signal.shape[0]), "y": signal[k].values, "label": np.full((signal.shape[0],),col_names[i])} for i,k in enumerate(signal)]
+    data[0]["y"] = data[0]["y"]/6 # Halve reference y dimension for better visualization
 
     # Load current data
     for i in range(args.num_sources):
@@ -269,6 +288,7 @@ def file_change(attrname, old, new, args, file_correspondence,
         leads[i].x_range.end = rangeslider.value[1]
 
     # Show used boxes
+    print(f'{fname}###{k}')
     for wave in all_waves:
         wavedic = eval(wave)
         boxes = eval(f"boxes_{wave}")
@@ -417,12 +437,12 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
 
                     # Predict mask
                     corr_mask = np.array(correlations) > slider_threshold.value
-                    ampl_mask = sak.signal.sigmoid(100*(amplitudes-0.5)) > 0.5
-                    corr_mask = corr_mask * ampl_mask
+                    ampl_mask = sak.signal.sigmoid(100*(amplitudes-0.75)) > 0.75
+                    corr_mask = 0.5*corr_mask + 0.5*ampl_mask
                     corr_onsets = []
                     corr_offsets = []
                     for on,off in zip(*sak.signal.get_mask_boundary(corr_mask)):
-                        if on != off: on += np.argmax(correlations[on:off])
+                        if on != off: on += np.argmax(corr_mask[on:off])
                         else:         on += 0
                         mask[on:on+fundamental.size] = True
 

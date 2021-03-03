@@ -69,7 +69,7 @@ for i,file in enumerate(all_filepaths):
     _, fname = os.path.split(file)
     fname, ext = os.path.splitext(fname)
     if file in tagged_points:
-        file_correspondence['/'.join([fname]) + f' @ {tagged_points[file]}'] = file
+        file_correspondence['/'.join([fname]) + f'@{tagged_points[file]}'] = file
         tagged_idx.append(i)
     else:
         file_correspondence['/'.join([fname])] = file
@@ -99,7 +99,7 @@ current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
 sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
-leads = [figure(plot_width=1550, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for _ in range(args.num_sources)]
+leads = [figure(plot_width=2400, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for i in range(args.num_sources)]
 previous_local_P = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_local_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_far_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
