@@ -47,19 +47,19 @@ boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="red")
 
 # Create delineation spans & mark as invisible
 span_Pon    = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_Poff   = 0 # [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_Poff   = [] # [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_QRSon  = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_QRSoff = 0 # [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_QRSoff = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_Ton    = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_Toff   = 0 # [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_Toff   = [] # [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 
 for wave in ["P", "QRS", "T"]:
-    # for t in ["on", "off"]:
-    # span = eval(f"span_{wave}{t}")
-    span = eval(f"span_{wave}on")
-    for i in range(args.num_sources):
-        for j in range(args.num_boxes):
-            span[i][j].visible = False
+    for t in ["on", "off"]:
+        span = eval(f"span_{wave}{t}")
+        for i in range(args.num_sources):
+            if i < len(span):
+                for j in range(args.num_boxes):
+                    span[i][j].visible = False
                 
 # Check different codes
 file_correspondence = {}
@@ -99,7 +99,7 @@ current_data = [{}   for _ in range(args.num_sources)]
 current_keys = [None for _ in range(args.num_sources)]
 sources = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,))}) for _ in range(args.num_sources)]
 sources_static = [ColumnDataSource(data={"x": np.arange(100), "y": np.zeros((100,)), "label": np.full((100,),"None")}) for _ in range(args.num_sources)]
-leads = [figure(plot_width=2400, plot_height=150, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for i in range(args.num_sources)]
+leads = [figure(plot_width=3000, plot_height=250, tools=tools, x_axis_type='auto', active_drag="xbox_select", active_scroll="ywheel_zoom") for i in range(args.num_sources)]
 previous_local_P = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_local_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
 previous_far_field = [[] for _ in range(args.num_sources)] # For doing the correlation thing safely
@@ -122,12 +122,20 @@ for i in range(args.num_sources):
         leads[i].add_layout(boxes_far_field[i][j])
         leads[i].add_layout(boxes_local_P[i][j])
         leads[i].add_layout(boxes_local_field[i][j])
-        leads[i].add_layout(span_Pon[i][j])
-        leads[i].add_layout(span_QRSon[i][j])
-        leads[i].add_layout(span_Ton[i][j])
-        # leads[i].add_layout(span_Poff[i][j])
-        # leads[i].add_layout(span_QRSoff[i][j])
-        # leads[i].add_layout(span_Toff[i][j])
+
+        # Add delineation spans to layout
+        if i < len(span_Pon):
+            leads[i].add_layout(span_Pon[i][j])
+        if i < len(span_QRSon):
+            leads[i].add_layout(span_QRSon[i][j])
+        if i < len(span_Ton):
+           leads[i].add_layout(span_Ton[i][j])
+        if i < len(span_Poff):
+            leads[i].add_layout(span_Poff[i][j])
+        if i < len(span_QRSoff):
+            leads[i].add_layout(span_QRSoff[i][j])
+        if i < len(span_Toff):
+            leads[i].add_layout(span_Toff[i][j])
 
 # Define figure grid
 grid = gridplot(leads, ncols=1, toolbar_location='above')

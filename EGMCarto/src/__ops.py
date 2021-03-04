@@ -116,10 +116,11 @@ def remove_delineations(span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, 
     for i,wave in enumerate(["P", "QRS", "T"]):
         # for t in ["on", "off"]:
         # span = eval(f"span_{wave}{t}")
-        span = eval(f"span_{wave}on")
-        for j in range(len(span)):
-            for k in range(len(span[j])):
-                span[j][k].visible = False
+        for fid in ["on", "off"]:
+            span = eval(f"span_{wave}{fid}")
+            for j in range(len(span)):
+                for k in range(len(span[j])):
+                    span[j][k].visible = False
 
 
 def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, span_Toff, args, file_selector, file_correspondence, models):
@@ -146,15 +147,17 @@ def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, spa
         # for t in ["on", "off"]:
         # fiducial = eval(t)
         # span = eval(f"span_{wave}{t}")
-        span = eval(f"span_{wave}on")
-        fiducial = on
-        for j in range(args.num_sources):
-            for k in range(args.num_boxes):
-                if k < len(fiducial):
-                    span[j][k].visible = True
-                    span[j][k].location = fiducial[k]*down_factor
-                else:
-                    span[j][k].visible = False
+        for fid in ["on", "off"]:
+            span = eval(f"span_{wave}{fid}")
+            fiducial = eval(fid)
+            for j in range(args.num_sources):
+                for k in range(args.num_boxes):
+                    if j < len(span):
+                        if k < len(fiducial):
+                            span[j][k].visible = True
+                            span[j][k].location = fiducial[k]*down_factor
+                        else:
+                            span[j][k].visible = False
 
 
 
