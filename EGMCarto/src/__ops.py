@@ -201,7 +201,7 @@ def file_change(attrname, old, new, args, file_correspondence,
                 current_data, current_keys, sources, sources_static, 
                 leads, boxes_local_field, boxes_local_P, boxes_far_field, rangeslider, 
                 textbox, all_waves, waveselector, local_field, far_field, local_P,
-                previous_local_field, previous_far_field, previous_local_P):
+                previous_local_field, previous_far_field, previous_local_P, referenceselector):
     fname = new
     if (fname == " ") or (fname is None) or (old == new):
         return None
@@ -217,7 +217,7 @@ def file_change(attrname, old, new, args, file_correspondence,
 
     # Include signals into data dict
     data = [{"x": np.arange(signal.shape[0]), "y": signal[k].values, "label": np.full((signal.shape[0],),col_names[i])} for i,k in enumerate(signal)]
-    data[0]["y"] = data[0]["y"]/6 # Halve reference y dimension for better visualization
+    data[0]["y"] = data[0]["y"]/4 # Divide reference amplitude for better visualization
 
     # Load current data
     for i in range(args.num_sources):
@@ -307,6 +307,32 @@ def file_change(attrname, old, new, args, file_correspondence,
                     boxes[i][j].visible = True
                 else:
                     boxes[i][j].visible = False
+
+
+def reference_change(attrname, old, new, file_selector, file_correspondence, current_data, sources, sources_static, current_keys):
+    reference = new
+    fname = file_selector.value
+    if (fname == " ") or (fname is None) or (old == new):
+        return None
+
+    # Load signal
+    signal,header = read_sample(file_correspondence[fname])
+
+    # Filter useless columns and sort
+    signal = sort_columns(signal)
+    signal = filter_bipolar(signal)
+    signal = filter_reference(signal,header,reference)
+    col_names = list(signal)
+
+    # Include signals into data dict
+    data = [{"x": np.arange(signal.shape[0]), "y": signal[col_names[0]].values, "label": np.full((signal.shape[0],),col_names[0])}]
+    data[0]["y"] = data[0]["y"]/4 # Divide reference amplitude for better visualization
+
+    # Overwrite reference signal
+    current_data[0] = data[0]
+    current_keys[0] = col_names[0]
+    sources[0].data = data[0]
+    sources_static[0].data = data[0]
 
 
 # define callback functions
@@ -440,7 +466,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
 
                     # Predict mask
                     corr_mask = np.array(correlations) > slider_threshold.value
-                    ampl_mask = sak.signal.sigmoid(100*(amplitudes-0.75)) > 0.75
+                    ampl_mask = sak.signal.sigmoid(100*(amplitudes-slider_threshold.value)) > slider_threshold.value
                     corr_mask = 0.5*corr_mask + 0.5*ampl_mask
                     corr_onsets = []
                     corr_offsets = []
@@ -622,8 +648,12 @@ def filter_bipolar(data):
     return data_bipolar
 
 
-def filter_reference(data,header):
-    if "Reference Channel" in header:
+def filter_reference(data,header,reference_channel: str = None):
+    if reference_channel is not None:
+        filt_columns = [col for col in data.columns if (col.upper() not in StandardHeader) or (reference_channel in col)]
+
+        return data.filter(filt_columns)
+    elif "Reference Channel" in header:
         reference_channel = header["Reference Channel"]
         
         filt_columns = [col for col in data.columns if (col.upper() not in StandardHeader) or (reference_channel in col)]

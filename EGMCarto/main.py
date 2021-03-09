@@ -40,6 +40,9 @@ all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','*','Export','*E
 tagged_points = src.get_tagged_points(args.basedir)
 tools = 'xbox_select,reset,ywheel_zoom,pan,box_zoom,undo,redo,save,crosshair,hover'
 
+for k in tagged_points:
+    tagged_points[k] = tagged_points[k].replace(" ","")
+
 # Create annotation boxes
 boxes_far_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="magenta") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 boxes_local_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="green") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
@@ -91,8 +94,9 @@ for wave in all_waves:
     if os.path.isfile(f"./{wave}.csv"):
         tmp = sak.load_data(f"./{wave}.csv")
         for k in tmp:
+            knew = k.replace(" ", "")
             onoff = np.array(tmp[k])
-            wavedic[k] = [[on,off] for (on,off) in zip(onoff[::2],onoff[1::2])]
+            wavedic[knew] = [[on,off] for (on,off) in zip(onoff[::2],onoff[1::2])]
 
 # Set up sources
 current_data = [{}   for _ in range(args.num_sources)]
@@ -156,6 +160,7 @@ for i in range(5):
 rangeslider = RangeSlider(start=0, end=2500, step=10, value=(0,2500), title="X range")
 slider_threshold = Slider(start=0.5, end=1, step=0.01, value=0.90, title="Threshold for propagation")
 file_selector = Select(value=" ", options=files)
+referenceselector = Select(value="V3", options=StandardHeader.tolist())
 waveselector = RadioButtonGroup(labels=["P", "LF", "FF"], active=0, height_policy="fit", width_policy="fixed", width=80, orientation="vertical")
 textbox = PreText(text="New points:      \t[]")
 retrievebutton = Button(label='Retrieve Segmentation')
@@ -167,6 +172,10 @@ undelineatebutton = Button(label='Undelineate')
 
 
 # Set callbacks
+referenceselector.on_change('value', partial(src.reference_change, file_selector=file_selector, 
+                                             file_correspondence=file_correspondence, current_data=current_data,
+                                             sources=sources, sources_static=sources_static, current_keys=current_keys))
+
 file_selector.on_change('value', partial(src.file_change, args=args, file_correspondence=file_correspondence, 
                                          current_data=current_data, current_keys=current_keys, 
                                          sources=sources, sources_static=sources_static, 
@@ -177,7 +186,8 @@ file_selector.on_change('value', partial(src.file_change, args=args, file_corres
                                          local_field=local_field, far_field=far_field, local_P=local_P, 
                                          previous_local_field=previous_local_field, 
                                          previous_far_field=previous_far_field, 
-                                         previous_local_P=previous_local_P))#, cb_save_segmentation)
+                                         previous_local_P=previous_local_P,
+                                         referenceselector=referenceselector))#, cb_save_segmentation)
 for i,source in enumerate(sources):
     source.selected.on_change('indices', partial(src.selection_change, i=i, all_waves=all_waves, file_selector=file_selector, 
                                                  sources=sources, waveselector=waveselector, leads=leads, 
@@ -211,7 +221,7 @@ undelineatebutton.on_click(partial(src.remove_delineations, span_Pon=span_Pon, s
 # set up layout
 buttons = row(retrievebutton,writebutton,delineatebutton,undelineatebutton)
 visor = row(grid,propagatebutton,storebutton,waveselector)
-layout = column(file_selector,textbox,slider_threshold,rangeslider,buttons,visor)
+layout = column(file_selector,referenceselector,textbox,slider_threshold,rangeslider,buttons,visor)
 
 # initialize
 curdoc().add_root(layout)
