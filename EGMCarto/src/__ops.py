@@ -273,7 +273,7 @@ def file_change(attrname, old, new, args, file_correspondence,
     # Input segmentation info for every wave
     for i,k in enumerate(signal):
         onoff = np.array(wavedic.get(f'{fname}###{k}', []))
-        onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+        onoff = [np.arange(on,off+1,dtype=int) for on,off in onoff]
         if len(onoff) == 0:
             sources[i].selected.indices = []
         else:
@@ -291,7 +291,7 @@ def file_change(attrname, old, new, args, file_correspondence,
         leads[i].x_range.end = rangeslider.value[1]
 
     # Show used boxes
-    print(f'{fname}###{k}')
+    # print(f'{fname}###{k}')
     for wave in all_waves:
         wavedic = eval(wave)
         boxes = eval(f"boxes_{wave}")
@@ -356,7 +356,7 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
         if k is None:
             continue
         onoff = np.array(wavedic.get(f'{fname}###{k}', []))
-        onoff = [np.arange(on,off,dtype=int) for on,off in onoff]
+        onoff = [np.arange(on,off+1,dtype=int) for on,off in onoff]
         if len(onoff) == 0:
             sources[i].selected.indices = []
         else:
@@ -432,7 +432,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
                     signal = np.copy(source.data["y"]).astype(float)
 
                     # Define fundamental
-                    fundamental = sak.signal.on_off_correction(np.copy(signal[mask].astype(float)))
+                    fundamental = np.copy(signal[mask].astype(float))#sak.signal.on_off_correction(np.copy(signal[mask].astype(float)))
                     ampl_fundamental = sak.signal.amplitude(fundamental)
                                 
                     # Obtain windowing
@@ -444,7 +444,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
                     for j,window in enumerate(windowed_signal):
                         # Correct deviations w.r.t zero
                         try:
-                            w = sak.signal.on_off_correction(np.copy(window))
+                            w = np.copy(window)# sak.signal.on_off_correction(np.copy(window))
                             c,_ = sak.signal.xcorr(fundamental,w,maxlags=0)
                             correlations[j] = c
                             ampl_w = sak.signal.amplitude(w)
@@ -540,7 +540,7 @@ def retrieve_segmentation(file_selector, waveselector, current_keys, local_field
     wavedic = eval(wave)
     for i,k in enumerate(current_keys):
         if (k is not None) and (len(wavedic.get(f'{fname}###{k}',[])) != 0):
-            sources[i].selected.indices = np.concatenate([np.arange(on,off) for on,off in wavedic[f'{fname}###{k}']]).astype(int).squeeze().tolist()
+            sources[i].selected.indices = np.concatenate([np.arange(on,off+1) for on,off in wavedic[f'{fname}###{k}']]).astype(int).squeeze().tolist()
         else:
             sources[i].selected.indices = []
 

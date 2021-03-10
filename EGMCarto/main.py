@@ -44,9 +44,9 @@ for k in tagged_points:
     tagged_points[k] = tagged_points[k].replace(" ","")
 
 # Create annotation boxes
-boxes_far_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="magenta") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-boxes_local_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="green") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,fill_color="red") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+boxes_far_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,line_alpha=1,line_width=1.,fill_color="magenta") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+boxes_local_field = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,line_alpha=1,line_width=1.,fill_color="green") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,line_alpha=1,line_width=1.,fill_color="red") for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 
 # Create delineation spans & mark as invisible
 span_Pon    = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
