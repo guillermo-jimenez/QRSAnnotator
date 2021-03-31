@@ -252,6 +252,8 @@ def file_change(attrname, old, new, args, file_correspondence,
     # signal = filter_bipolar(signal)
     # signal = filter_reference(signal,header)
     col_names = list(signal)
+    # print(col_names)
+    # print(fname)
 
     # Include signals into data dict
     data = [{"x": np.arange(signal.shape[0]), "y": signal[k].values, "label": np.full((signal.shape[0],),col_names[i])} for i,k in enumerate(signal)]
@@ -291,6 +293,8 @@ def file_change(attrname, old, new, args, file_correspondence,
         wavedic = eval(wave)
 
         for k in signal:
+            if k is not None:
+                k = k.replace(" ","")
             onoff = np.array(wavedic.get(f'{fname}###{k}',[]))
             if onoff.size == 0:
                 continue
@@ -310,6 +314,8 @@ def file_change(attrname, old, new, args, file_correspondence,
 
     # Input segmentation info for every wave
     for i,k in enumerate(signal):
+        if k is not None:
+            k = k.replace(" ", "")
         onoff = np.array(wavedic.get(f'{fname}###{k}', []))
         onoff = [np.arange(on,off+1,dtype=int) for on,off in onoff]
         if len(onoff) == 0:
@@ -336,6 +342,8 @@ def file_change(attrname, old, new, args, file_correspondence,
 
         for i in range(args.num_sources):
             k = current_keys[i]
+            if k is not None:
+                k = k.replace(" ","")
             
             for j in range(args.num_boxes):
                 if j < len(wavedic.get(f'{fname}###{k}',[])):
@@ -394,6 +402,7 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
     for i,k in enumerate(current_keys):
         if k is None:
             continue
+        k = k.replace(" ","")
         onoff = np.array(wavedic.get(f'{fname}###{k}', []))
         onoff = [np.arange(on,off+1,dtype=int) for on,off in onoff]
         if len(onoff) == 0:
@@ -415,6 +424,8 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
 
         for i in range(args.num_sources):
             k = current_keys[i]
+            if k is not None:
+                k = k.replace(" ","")
 
             for j in range(args.num_boxes):
                 if j < len(wavedic.get(f'{fname}###{k}', [])):
@@ -578,6 +589,8 @@ def retrieve_segmentation(file_selector, waveselector, current_keys, local_field
 
     wavedic = eval(wave)
     for i,k in enumerate(current_keys):
+        if k is not None:
+            k = k.replace(" ","")
         if (k is not None) and (len(wavedic.get(f'{fname}###{k}',[])) != 0):
             sources[i].selected.indices = np.concatenate([np.arange(on,off+1) for on,off in wavedic[f'{fname}###{k}']]).astype(int).squeeze().tolist()
         else:
