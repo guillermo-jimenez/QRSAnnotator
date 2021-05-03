@@ -327,7 +327,7 @@ def file_change(attrname, old, new, args, file_correspondence,
                 tmp = np.concatenate(onoff).squeeze().tolist()
             previous[i] = tmp
             sources[i].selected.indices = tmp
-            textbox.text = "Loaded points"
+            print("Loaded points")
 
     # Set xlim
     for i,k in enumerate(signal):
@@ -414,7 +414,7 @@ def wave_change(attrname, old, new, args, all_waves, file_selector, local_field,
                 tmp = np.concatenate(onoff).squeeze().tolist()
             previous[i] = tmp
             sources[i].selected.indices = tmp
-            textbox.text = "Loaded points"
+            print("Loaded points")
 
     # Show used boxes
     for wave in all_waves:
@@ -576,7 +576,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
             boxes[i][j].visible = True
 
 
-def retrieve_segmentation(file_selector, waveselector, current_keys, local_field, local_P, far_field, sources):
+def retrieve_segmentation(file_selector, waveselector, current_keys, local_field, local_P, far_field, sources, all_waves):
     fname = file_selector.value
     if (fname == " ") or (fname is None):
         return None
@@ -618,6 +618,7 @@ def save_segmentation(file_selector, all_waves, waveselector, sources, current_k
         k = current_keys[i]
         if k is None:
             continue
+        k = k.replace(" ","")
 
         # 2.1. Generate binary mask
         binary_mask = np.zeros((source.data["x"].size,),dtype=bool)
@@ -637,9 +638,9 @@ def save_segmentation(file_selector, all_waves, waveselector, sources, current_k
             wavedic.pop(f'{fname}###{k}')
 
     if counter > 0:
-        textbox.text = f"Stored segmentation for {wave}. \t"
+        print(f"Stored segmentation for {wave}. \t")
     else:
-        textbox.text = f"No segmentation found for {wave}. Skipping... \t"
+        print(f"No segmentation found for {wave}. Skipping... \t")
         
 def write_segmentation(all_waves,local_field,far_field,local_P):
     for wave in all_waves:

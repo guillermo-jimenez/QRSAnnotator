@@ -118,7 +118,7 @@ for i in range(args.num_sources):
         if i < len(span_QRSon):
             leads[i].add_layout(span_QRSon[i][j])
         if i < len(span_Ton):
-           leads[i].add_layout(span_Ton[i][j])
+            leads[i].add_layout(span_Ton[i][j])
         if i < len(span_Poff):
             leads[i].add_layout(span_Poff[i][j])
         if i < len(span_QRSoff):
@@ -182,7 +182,7 @@ for i,source in enumerate(sources):
                                                  previous_local_P=previous_local_P, slider_threshold=slider_threshold))#, cb_save_segmentation)
 retrievebutton.on_click(partial(src.retrieve_segmentation, file_selector=file_selector, waveselector=waveselector, 
                                 current_keys=current_keys, local_field=local_field, local_P=local_P, 
-                                far_field=far_field, sources=sources))
+                                far_field=far_field, sources=sources, all_waves=all_waves))
 storebutton.on_click(partial(src.save_segmentation, file_selector=file_selector, waveselector=waveselector, sources=sources, 
                              current_keys=current_keys, local_field=local_field, local_P=local_P, 
                              far_field=far_field, textbox=textbox, all_waves=all_waves))
