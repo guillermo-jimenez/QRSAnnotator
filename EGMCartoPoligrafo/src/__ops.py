@@ -462,6 +462,11 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
         if len(set_new.difference(set_old)) > 0:
             # Define list of new points
             new_pts = np.array(list(set_new.difference(set_old)))
+            size_before = new_pts.size
+            new_pts = new_pts[new_pts < source.data["x"].size]
+            size_after = new_pts.size
+            if size_before != size_after:
+                print("Might have an error in this point if behaviour is unexpected (1)")
             
             # Binary close masks
             mask = np.zeros_like(source.data["x"],dtype=bool)
@@ -535,6 +540,11 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
         elif len(set_old.difference(set_new)) > 0:
             # Define list of deleted points
             erased_pts = np.array(list(set_old.difference(set_new)))
+            size_before = erased_pts.size
+            erased_pts = erased_pts[erased_pts < source.data["x"].size]
+            size_after = erased_pts.size
+            if size_before != size_after:
+                print("Might have an error in this point if behaviour is unexpected (2)")
 
             # Binary close masks
             mask = np.zeros_like(source.data["x"],dtype=bool)
