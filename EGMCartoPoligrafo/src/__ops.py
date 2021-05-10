@@ -479,7 +479,7 @@ def selection_change(attrname, old, new, i, all_waves, file_selector, sources, w
             mask = np.pad(mask,kernel_size)
             mask = skimage.morphology.binary_closing(mask, np.ones((kernel_size,)))[kernel_size:-kernel_size]
 
-            if (slider_threshold.value is not None) and (propagatebutton.active):
+            if (slider_threshold.value is not None) and (propagatebutton.active) and (np.any(mask) != False):
                 has_been_executed = False
                 while not has_been_executed:
                     #~~ Try to propagate new points by convolving with > 0.99% cross-correlation ~~#
