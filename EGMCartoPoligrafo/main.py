@@ -36,7 +36,9 @@ args = parser.parse_args(sys.argv[1:])
 
 # Hyperparameters
 all_waves = ["local_P", "local_field", "far_field"]
-all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','Poligrafo','*.txt'))
+all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
+print(f"Files found: {len(all_filepaths)} files")
+# all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','Poligrafo','*.txt'))
 tools = 'xbox_select,reset,ywheel_zoom,pan,box_zoom,undo,redo,save,crosshair,hover'
 
 # Create annotation boxes
@@ -129,15 +131,16 @@ for i in range(args.num_sources):
 # Define figure grid
 grid = gridplot(leads, ncols=1, toolbar_location='above')
 
-# Load delineation models
-basepath = f'/media/guille/DADES/DADES/Delineator'
-model_type = 'model_best'
+models = None
+# # Load delineation models
+# basepath = f'/media/guille/DADES/DADES/Delineator'
+# model_type = 'model_best'
 
-# Load models
-models = {}
-for i in range(5):
-    path = os.path.join(basepath, 'TrainedModels', args.model_name, f'fold_{i+1}', f'{model_type}.model')
-    models[f'fold_{i+1}'] = torch.load(path, pickle_module=dill).eval().float()
+# # Load models
+# models = {}
+# for i in range(5):
+#     path = os.path.join(basepath, 'TrainedModels', args.model_name, f'fold_{i+1}', f'{model_type}.model')
+#     models[f'fold_{i+1}'] = torch.load(path, pickle_module=dill).eval().float()
 
 
 

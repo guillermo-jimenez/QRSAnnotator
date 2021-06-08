@@ -1,0 +1,7 @@
+# A REVISAR
+[19526]_1_demasiado_acoplado  ### NO ANOTADO
+[19526]_2_VA_decremento       ### WOBBLY
+[19526]_4_VA_IDK              ### DESCOORDINADO ECG CON IECM
+[19585]_3_atrial_fibrillation ### COMO ANOTAR?
+[19625]_1_AV_decremento       ### MIRAR ULTIMOS LATIDOS FF
+[19625]_3_VA_decremento       ### COMO ANOTAR
