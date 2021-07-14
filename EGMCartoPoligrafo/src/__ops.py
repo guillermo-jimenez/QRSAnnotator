@@ -652,10 +652,13 @@ def save_segmentation(file_selector, all_waves, waveselector, sources, current_k
     else:
         print(f"No segmentation found for {wave}. Skipping... \t")
         
-def write_segmentation(all_waves,local_field,far_field,local_P):
+def write_segmentation(all_waves,local_field,far_field,local_P,test=False):
     for wave in all_waves:
         wavedic = eval(wave)
-        sak.save_data(wavedic,f'./{wave}.csv')
+        if test:
+            sak.save_data(wavedic,f'./{wave}_TEST.csv')
+        else:
+            sak.save_data(wavedic,f'./{wave}.csv')
 
 def change_range(attrname, old, new, rangeslider, leads):
     low, high = rangeslider.value

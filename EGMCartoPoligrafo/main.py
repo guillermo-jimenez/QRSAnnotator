@@ -31,6 +31,7 @@ parser.add_argument("--num_boxes",   type=int, default=150)
 parser.add_argument("--num_sources", type=int, default=20)
 parser.add_argument("--threshold",   type=float, default=None)
 parser.add_argument("--title",       type=str, default="Project")
+parser.add_argument("--test" ,       type=bool, default=False)
 parser.add_argument("--model_name",  type=str, default="WNet5LevelsSelfAttentionDiceOnly_20201130125349")
 args = parser.parse_args(sys.argv[1:])
 
@@ -78,12 +79,20 @@ far_field = {}
 
 for wave in all_waves:
     wavedic = eval(wave)
-    if os.path.isfile(f"./{wave}.csv"):
-        tmp = sak.load_data(f"./{wave}.csv")
-        for k in tmp:
-            knew = k.replace(" ", "")
-            onoff = np.array(tmp[k])
-            wavedic[knew] = [[on,off] for (on,off) in zip(onoff[::2],onoff[1::2])]
+    if args.test:
+        if os.path.isfile(f"./{wave}_TEST.csv"):
+            tmp = sak.load_data(f"./{wave}_TEST.csv")
+            for k in tmp:
+                knew = k.replace(" ", "")
+                onoff = np.array(tmp[k])
+                wavedic[knew] = [[on,off] for (on,off) in zip(onoff[::2],onoff[1::2])]
+    else:
+        if os.path.isfile(f"./{wave}.csv"):
+            tmp = sak.load_data(f"./{wave}.csv")
+            for k in tmp:
+                knew = k.replace(" ", "")
+                onoff = np.array(tmp[k])
+                wavedic[knew] = [[on,off] for (on,off) in zip(onoff[::2],onoff[1::2])]
 
 # Set up sources
 current_data = [{}   for _ in range(args.num_sources)]
@@ -132,15 +141,15 @@ for i in range(args.num_sources):
 grid = gridplot(leads, ncols=1, toolbar_location='above')
 
 models = None
-# # Load delineation models
-# basepath = f'/media/guille/DADES/DADES/Delineator'
-# model_type = 'model_best'
+# Load delineation models
+basepath = f'/media/guille/DADES/DADES/Delineator'
+model_type = 'model_best'
 
-# # Load models
-# models = {}
-# for i in range(5):
-#     path = os.path.join(basepath, 'TrainedModels', args.model_name, f'fold_{i+1}', f'{model_type}.model')
-#     models[f'fold_{i+1}'] = torch.load(path, pickle_module=dill).eval().float()
+# Load models
+models = {}
+for i in range(5):
+    path = os.path.join(basepath, 'TrainedModels', 'modelos', f'model.{i+1}')
+    models[f'fold_{i+1}'] = torch.load(path, pickle_module=dill).eval().float()
 
 
 
@@ -189,7 +198,7 @@ retrievebutton.on_click(partial(src.retrieve_segmentation, file_selector=file_se
 storebutton.on_click(partial(src.save_segmentation, file_selector=file_selector, waveselector=waveselector, sources=sources, 
                              current_keys=current_keys, local_field=local_field, local_P=local_P, 
                              far_field=far_field, textbox=textbox, all_waves=all_waves))
-writebutton.on_click(partial(src.write_segmentation, all_waves=all_waves, local_field=local_field, far_field=far_field, local_P=local_P))
+writebutton.on_click(partial(src.write_segmentation, all_waves=all_waves, local_field=local_field, far_field=far_field, local_P=local_P, test=args.test))
 rangeslider.on_change('value', partial(src.change_range, rangeslider=rangeslider, leads=leads))
 waveselector.on_change('active', partial(src.wave_change, args=args, all_waves=all_waves, file_selector=file_selector, 
                                          local_field=local_field, far_field=far_field, 
