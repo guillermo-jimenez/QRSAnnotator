@@ -155,7 +155,7 @@ for i in range(5):
 
 # Set widgets
 rangeslider = RangeSlider(start=0, end=2500, step=10, value=(0,2500), title="X range")
-slider_threshold = Slider(start=0.5, end=1, step=0.01, value=0.90, title="Threshold for propagation")
+slider_threshold = Slider(start=0.5, end=1, step=0.01, value=0.80, title="Threshold for propagation")
 file_selector = Select(value=" ", options=files)
 referenceselector = Select(value="V3", options=StandardHeader.tolist())
 waveselector = RadioButtonGroup(labels=["P", "LF", "FF"], active=0, height_policy="fit", width_policy="fixed", width=80, orientation="vertical")
