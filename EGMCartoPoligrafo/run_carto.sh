@@ -1,2 +1,2 @@
-tput reset && bokeh serve . --args --basedir /media/guille/DADES/DADES/EGMDelineator/Databases/CARTOEXPORT
+tput reset && bokeh serve . --args --basedir /media/guille/DADES/DADES/EGMDelineator/Databases/CARTOEXPORT_BIPOLAR --num_boxes 20 --num_sources 50
 # bokeh serve . --args --basedir C:/Users/Guille/Documents/DADES/EGMDelineator/Poligrafo

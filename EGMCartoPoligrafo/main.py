@@ -37,13 +37,8 @@ args = parser.parse_args(sys.argv[1:])
 
 # Hyperparameters
 all_waves = ["local_P", "local_field", "far_field"]
-if "CARTO" in args.basedir:
-    all_filepaths = glob.glob(os.path.join(args.basedir,'*','*_ECG_Export.txt'))
-else:
-    all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
-# all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
+all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
 print(f"Files found: {len(all_filepaths)} files")
-# all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','Poligrafo','*.txt'))
 tools = 'xbox_select,reset,ywheel_zoom,pan,box_zoom,undo,redo,save,crosshair,hover'
 
 # Create annotation boxes
@@ -55,7 +50,8 @@ boxes_local_P = [[BoxAnnotation(left=0,right=0,fill_alpha=0.05,line_alpha=1,line
 span_Pon    = [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_Poff   = [] # [[Span(location=0,dimension='height',line_color='red',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_QRSon  = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
-span_QRSoff = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+# span_QRSoff = [[Span(location=0,dimension='height',line_color='green',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
+span_QRSoff = []
 span_Ton    = [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 span_Toff   = [] # [[Span(location=0,dimension='height',line_color='magenta',line_dash='dashed', line_width=2) for _ in range(args.num_boxes)] for _ in range(args.num_sources)]
 

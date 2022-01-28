@@ -223,21 +223,32 @@ def predict(basedir, span_Pon, span_Poff, span_QRSon, span_QRSoff, span_Ton, spa
     segmentation = segmentation >= 3
 
     for i,wave in enumerate(["P", "QRS", "T"]):
-        on,off = sak.signal.get_mask_boundary(segmentation[i,:])
+        on,off = np.array(sak.signal.get_mask_boundary(segmentation[i,:]))
+        center = ((on+off)//2).tolist()
         # for t in ["on", "off"]:
         # fiducial = eval(t)
         # span = eval(f"span_{wave}{t}")
-        for fid in ["on", "off"]:
-            span = eval(f"span_{wave}{fid}")
-            fiducial = eval(fid)
-            for j in range(args.num_sources):
-                for k in range(args.num_boxes):
-                    if j < len(span):
-                        if k < len(fiducial):
-                            span[j][k].visible = True
-                            span[j][k].location = fiducial[k]*down_factor
-                        else:
-                            span[j][k].visible = False
+        span = eval(f"span_{wave}on")
+        fiducial = center
+        for j in range(args.num_sources):
+            for k in range(args.num_boxes):
+                if j < len(span):
+                    if k < len(fiducial):
+                        span[j][k].visible = True
+                        span[j][k].location = fiducial[k]*down_factor
+                    else:
+                        span[j][k].visible = False
+        # for fid in ["on", "off"]:
+        #     span = eval(f"span_{wave}{fid}")
+        #     fiducial = eval(fid)
+        #     for j in range(args.num_sources):
+        #         for k in range(args.num_boxes):
+        #             if j < len(span):
+        #                 if k < len(fiducial):
+        #                     span[j][k].visible = True
+        #                     span[j][k].location = fiducial[k]*down_factor
+        #                 else:
+        #                     span[j][k].visible = False
 
 
 
