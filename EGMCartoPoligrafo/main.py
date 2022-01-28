@@ -37,7 +37,11 @@ args = parser.parse_args(sys.argv[1:])
 
 # Hyperparameters
 all_waves = ["local_P", "local_field", "far_field"]
-all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
+if "CARTO" in args.basedir:
+    all_filepaths = glob.glob(os.path.join(args.basedir,'*','*_ECG_Export.txt'))
+else:
+    all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
+# all_filepaths = glob.glob(os.path.join(args.basedir,'*.txt'))
 print(f"Files found: {len(all_filepaths)} files")
 # all_filepaths = glob.glob(os.path.join(args.basedir,'Databases','Poligrafo','*.txt'))
 tools = 'xbox_select,reset,ywheel_zoom,pan,box_zoom,undo,redo,save,crosshair,hover'
@@ -142,7 +146,7 @@ grid = gridplot(leads, ncols=1, toolbar_location='above')
 
 models = None
 # Load delineation models
-basepath = f'/media/guille/DADES/DADES/Delineator'
+basepath = f'/media/guille/DADES/DADES/ECG/Delineator'
 model_type = 'model_best'
 
 # Load models

@@ -27,6 +27,49 @@ from bokeh.models.tools import HoverTool, WheelZoomTool, PanTool, CrosshairTool
 from bokeh.plotting import figure
 from sak.signal import StandardHeader
 
+def Read_CARTO3_ECG(filename: str) -> Tuple[np.ndarray, list]:
+    # Read file
+    with open(filename,'r') as fid:
+        lines = fid.read().splitlines()
+        
+    (fmt,gain,chn,hea),lines = lines[:4],lines[4:]
+    assert fmt == "ECG_Export_4.0"
+    # Recover header information
+    chn = [c.split(" ")[0] for c in chn.split("=")[1:]]
+    N_sigs  = len(hea.split("("))-1
+    N_chars = len(hea)//N_sigs
+    assert len(hea)%N_sigs == 0, "CHECK HEADER FORMAT, NOT EVENLY DISTRIBUTED"
+    header = {
+        "gain": float(gain.split(" = ")[1]),
+        "UnipolarChannel":  chn[0],
+        "BipolarChannel":   chn[1],
+        "ReferenceChannel": chn[2],
+        "Channels":         [hea[i:i+N_chars].replace(" ","") for i in range(0,len(hea),N_chars)]
+    }
+
+    signal = np.zeros((N_sigs,len(lines)),dtype=int)
+    for i,line in enumerate(lines):
+        mod = 0
+        for j in range(N_sigs):
+            if j == 0:
+                num = line[-N_chars:]
+                if (line[-N_chars-1]) == '-':
+                    num = line[-N_chars-1] + num
+                    mod = mod + 1
+            else:
+                num = line[-(j+1)*N_chars-mod:-j*N_chars-mod]
+                if j != N_sigs-1:
+                    if (line[-(j+1)*N_chars-mod-1]) == '-':
+                        num = line[-(j+1)*N_chars-mod-1] + num
+                        mod = mod + 1
+
+            signal[j,-1-i] = int(num)
+
+    signal = signal[::-1,::-1]
+            
+    return (signal, header)
+
+
 def predict_mask(signal, model, window_size=2048, stride=256, thr_dice=0.9, percentile=95, ptg_voting = 0.5, batch_size = 16, use_tqdm=False, normalize=False, norm_threshold=1e-6, filter=False):
     # Preprocess signal
     signal = np.copy(signal).squeeze()
